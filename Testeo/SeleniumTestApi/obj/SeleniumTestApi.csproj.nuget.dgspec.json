@@ -1,0 +1,80 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\Users\\José Carrillo\\Desktop\\api-new\\Testeo\\SeleniumTestApi\\SeleniumTestApi.csproj": {}
+  },
+  "projects": {
+    "C:\\Users\\José Carrillo\\Desktop\\api-new\\Testeo\\SeleniumTestApi\\SeleniumTestApi.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\José Carrillo\\Desktop\\api-new\\Testeo\\SeleniumTestApi\\SeleniumTestApi.csproj",
+        "projectName": "SeleniumTestApi",
+        "projectPath": "C:\\Users\\José Carrillo\\Desktop\\api-new\\Testeo\\SeleniumTestApi\\SeleniumTestApi.csproj",
+        "packagesPath": "C:\\Users\\José Carrillo\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\José Carrillo\\Desktop\\api-new\\Testeo\\SeleniumTestApi\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\José Carrillo\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "RestSharp": {
+              "target": "Package",
+              "version": "[112.1.0, )"
+            },
+            "Selenium.WebDriver": {
+              "target": "Package",
+              "version": "[4.26.1, )"
+            },
+            "Selenium.WebDriver.ChromeDriver": {
+              "target": "Package",
+              "version": "[130.0.6723.11600, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.401/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}
