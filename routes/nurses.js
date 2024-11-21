@@ -210,21 +210,50 @@ router.get('/search', authenticateToken, async (req, res) => {
  *             properties:
  *               name:
  *                 type: string
- *               user_name:
- *                 type: string
- *               password:
- *                 type: string
- *               especialidad:
- *                 type: string
+ *                 example: "Juan Pérez"
  *               fecha_nacimiento:
  *                 type: string
  *                 format: date
+ *                 example: "1990-05-15"
+ *               genero:
+ *                 type: string
+ *                 example: "Masculino"
+ *               especialidad:
+ *                 type: string
+ *                 example: "Geriatría"
+ *               ubicacion:
+ *                 type: string
+ *                 example: "Madrid"
+ *               tarifa:
+ *                 type: number
+ *                 example: 50
+ *               disponibilidad:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     dia:
+ *                       type: string
+ *                       example: "Lunes"
+ *                     horaInicio:
+ *                       type: string
+ *                       example: "08:00"
+ *                     horaFin:
+ *                       type: string
+ *                       example: "17:00"
+ *               user_name:
+ *                 type: string
+ *                 example: "juanperez"
+ *               password:
+ *                 type: string
+ *                 example: "password123"
  *     responses:
  *       201:
  *         description: Enfermero registrado exitosamente
  *       400:
  *         description: Error en el registro del enfermero
  */
+
 router.post('/register', async (req, res) => {
   try {
     const { name, user_name, password, especialidad } = req.body;
