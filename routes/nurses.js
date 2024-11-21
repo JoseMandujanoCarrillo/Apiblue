@@ -256,9 +256,34 @@ router.get('/search', authenticateToken, async (req, res) => {
 
 router.post('/register', async (req, res) => {
   try {
-    const { name, user_name, password, especialidad } = req.body;
+    const {
+      name,
+      fecha_nacimiento,
+      genero,
+      especialidad,
+      ubicacion,
+      tarifa,
+      disponibilidad,
+      user_name,
+      password,
+      descripcion,
+      certificados
+    } = req.body;
 
-    const newNurse = new Nurse({ name, user_name, password, especialidad });
+    const newNurse = new Nurse({
+      name,
+      fecha_nacimiento,
+      genero,
+      especialidad,
+      ubicacion,
+      tarifa,
+      disponibilidad,
+      user_name,
+      password,
+      descripcion,
+      certificados
+    });
+
     await newNurse.save();
 
     const token = generateToken(newNurse._id);
@@ -271,7 +296,6 @@ router.post('/register', async (req, res) => {
     res.status(400).json({ message: 'Error en el registro del enfermero', error: error.message });
   }
 });
-
 /**
  * @swagger
  * /nurses/login:
