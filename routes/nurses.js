@@ -216,6 +216,9 @@ router.get('/search', authenticateToken, async (req, res) => {
  *                 type: string
  *               especialidad:
  *                 type: string
+ *               fecha_nacimiento:
+ *                 type: string
+ *                 format: date
  *     responses:
  *       201:
  *         description: Enfermero registrado exitosamente
