@@ -55,13 +55,17 @@ router.post('/', authenticateToken, async (req, res) => {
 
   try {
     // Verificar que los pacientes pertenecen al usuario autenticado
-    const validPatients = await Patient.find({ _id: { $in: patient_ids }, usuario_id: req.userId });
+    const validPatients = await Patient.find({
+      _id: { $in: patient_ids },
+      usuario_id: String(req.user.userId) // Asegurarse que el `usuario_id` sea una cadena
+    });
+
     if (validPatients.length !== patient_ids.length) {
       return res.status(403).json({ message: 'Acceso denegado a uno o más pacientes seleccionados' });
     }
 
     const newRequest = new ServiceRequest({
-      user_id: req.userId,
+      user_id: req.user.userId, // Asegúrate de que sea un string
       nurse_id,
       patient_ids,
       detalles,
@@ -129,7 +133,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
   try {
     const filter = {
-      $or: [{ user_id: req.userId }, { nurse_id: req.userId }]
+      $or: [{ user_id: req.user.userId }, { nurse_id: req.user.userId }]
     };
 
     if (estado) {
@@ -198,7 +202,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
   try {
     const serviceRequest = await ServiceRequest.findOneAndUpdate(
-      { _id: req.params.id, nurse_id: req.userId },
+      { _id: req.params.id, nurse_id: req.user.userId },
       { estado },
       { new: true }
     );
@@ -238,7 +242,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const serviceRequest = await ServiceRequest.findOne({
       _id: req.params.id,
-      $or: [{ user_id: req.userId }, { nurse_id: req.userId }]
+      $or: [{ user_id: req.user.userId }, { nurse_id: req.user.userId }]
     }).populate('patient_ids', 'name fecha_nacimiento genero descripcion');
 
     if (!serviceRequest) {
