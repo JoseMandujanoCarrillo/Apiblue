@@ -54,7 +54,7 @@ router.post('/', authenticateToken, async (req, res) => {
     // Verificar que el servicio fue completado
     const serviceRequest = await ServiceRequest.findOne({
       _id: service_request_id,
-      user_id: req.userId,
+      user_id: req.user.userId, // Usar req.user.userId extraído del token
       nurse_id,
       estado: 'completado'
     });
@@ -66,7 +66,7 @@ router.post('/', authenticateToken, async (req, res) => {
     // Crear la reseña
     const review = new Review({
       nurse_id,
-      user_id: req.userId,
+      user_id: req.user.userId, // Asignar el userId desde el token
       service_request_id,
       calificacion,
       comentario
@@ -144,7 +144,7 @@ router.get('/:nurse_id', authenticateToken, async (req, res) => {
     const nurse_id = req.params.nurse_id;
 
     // Verificar que el usuario autenticado es el enfermero que consulta las reseñas
-    if (req.userId !== nurse_id) {
+    if (req.user.userId !== nurse_id) {
       return res.status(403).json({ message: 'Acceso denegado' });
     }
 
@@ -157,10 +157,6 @@ router.get('/:nurse_id', authenticateToken, async (req, res) => {
         .skip(skip)
         .limit(Number(limit))
     ]);
-
-    if (!reviews.length) {
-      return res.status(404).json({ message: 'No se encontraron reseñas para este enfermero' });
-    }
 
     res.status(200).json({
       total,
