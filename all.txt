@@ -1,23 +1,376 @@
-routes\users.js:
+routes\messages.js:
 const express = require('express');
-const User = require('../models/User');
-const { generateToken, authenticateToken } = require('../middleware/auth');
+const Message = require('../models/Message');
+const ServiceRequest = require('../models/ServiceRequest');
+const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
 /**
  * @swagger
  * tags:
- *   name: Users
- *   description: Endpoints para la gestión de usuarios
+ *   name: Messages
+ *   description: Endpoints para la mensajería entre cliente y enfermero
  */
 
 /**
  * @swagger
- * /users/register:
+ * /messages:
  *   post:
- *     summary: Registro de usuario
- *     tags: [Users]
+ *     summary: Enviar un mensaje en una solicitud de servicio
+ *     tags: [Messages]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               service_request_id:
+ *                 type: string
+ *                 description: "ID de la solicitud de servicio"
+ *               receiver_id:
+ *                 type: string
+ *                 description: "ID del usuario receptor del mensaje"
+ *               content:
+ *                 type: string
+ *                 description: "Contenido del mensaje"
+ *     responses:
+ *       201:
+ *         description: Mensaje enviado exitosamente
+ *       400:
+ *         description: Error al enviar el mensaje
+ */
+router.post('/', authenticateToken, async (req, res) => {
+  const { service_request_id, receiver_id, content } = req.body;
+
+  try {
+    // Verificar que el usuario está involucrado en la solicitud de servicio
+    const serviceRequest = await ServiceRequest.findOne({
+      _id: service_request_id,
+      $or: [{ user_id: req.userId }, { nurse_id: req.userId }]
+    });
+
+    if (!serviceRequest) {
+      return res.status(403).json({ message: 'Acceso denegado' });
+    }
+
+    // Crear y guardar el mensaje
+    const message = new Message({
+      service_request_id,
+      sender_id: req.userId,
+      receiver_id,
+      content
+    });
+
+    await message.save();
+
+    res.status(201).json({ message: 'Mensaje enviado exitosamente', messageData: message });
+  } catch (error) {
+    res.status(400).json({ message: 'Error al enviar el mensaje', error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /messages/{service_request_id}:
+ *   get:
+ *     summary: Obtener el historial de mensajes de una solicitud de servicio con paginación
+ *     tags: [Messages]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: service_request_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID de la solicitud de servicio
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Número de página (por defecto 1)
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Número de resultados por página (por defecto 10)
+ *     responses:
+ *       200:
+ *         description: Historial de mensajes de la solicitud de servicio
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 total:
+ *                   type: integer
+ *                 page:
+ *                   type: integer
+ *                 limit:
+ *                   type: integer
+ *                 messages:
+ *                   type: array
+ *                   items:
+ *                     properties:
+ *                       sender_id:
+ *                         type: string
+ *                       receiver_id:
+ *                         type: string
+ *                       content:
+ *                         type: string
+ *                       timestamp:
+ *                         type: string
+ *                         format: date-time
+ *       403:
+ *         description: Acceso denegado
+ */
+router.get('/:service_request_id', authenticateToken, async (req, res) => {
+  const { page = 1, limit = 10 } = req.query;
+
+  try {
+    // Verificar que el usuario está involucrado en la solicitud de servicio
+    const serviceRequest = await ServiceRequest.findOne({
+      _id: req.params.service_request_id,
+      $or: [{ user_id: req.userId }, { nurse_id: req.userId }]
+    });
+
+    if (!serviceRequest) {
+      return res.status(403).json({ message: 'Acceso denegado' });
+    }
+
+    const skip = (page - 1) * limit;
+
+    // Obtener total de mensajes y mensajes paginados
+    const [total, messages] = await Promise.all([
+      Message.countDocuments({ service_request_id: req.params.service_request_id }),
+      Message.find({ service_request_id: req.params.service_request_id })
+        .sort({ timestamp: 1 }) // Ordenar por fecha de creación
+        .skip(skip) // Saltar registros para paginación
+        .limit(Number(limit)) // Límite de registros por página
+    ]);
+
+    res.status(200).json({
+      total, // Total de mensajes
+      page: Number(page), // Página actual
+      limit: Number(limit), // Límite por página
+      messages // Lista de mensajes
+    });
+  } catch (error) {
+    res.status(400).json({ message: 'Error al obtener el historial de mensajes', error: error.message });
+  }
+});
+
+module.exports = router;
+routes\nurses.js:
+const express = require('express');
+const Nurse = require('../models/Nurse');
+const { authenticateToken, generateToken } = require('../middleware/auth');
+
+const router = express.Router();
+
+/**
+ * @swagger
+ * tags:
+ *   name: Nurses
+ *   description: Endpoints para la gestión de enfermeros
+ */
+
+/**
+ * @swagger
+ * /nurses:
+ *   get:
+ *     summary: Obtener enfermeros (sin datos sensibles) con paginación
+ *     tags: [Nurses]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Número de página (por defecto 1)
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Número de resultados por página (por defecto 10)
+ *     responses:
+ *       200:
+ *         description: Lista de enfermeros
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 total:
+ *                   type: integer
+ *                 page:
+ *                   type: integer
+ *                 limit:
+ *                   type: integer
+ *                 nurses:
+ *                   type: array
+ *                   items:
+ *                     properties:
+ *                       name:
+ *                         type: string
+ *                       fecha_nacimiento:
+ *                         type: string
+ *                       genero:
+ *                         type: string
+ *                       descripcion:
+ *                         type: string
+ *                       especialidad:
+ *                         type: string
+ *                       ubicacion:
+ *                         type: string
+ *                       tarifa:
+ *                         type: number
+ *                       disponibilidad:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                       certificados:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *       500:
+ *         description: Error en el servidor
+ */
+router.get('/', authenticateToken, async (req, res) => {
+  const { page = 1, limit = 10 } = req.query;
+
+  try {
+    const skip = (page - 1) * limit;
+
+    const [total, nurses] = await Promise.all([
+      Nurse.countDocuments(), // Total de enfermeros
+      Nurse.find({}, '-user_name -password -_id') // Excluir campos sensibles
+        .skip(skip) // Paginación: saltar registros
+        .limit(Number(limit)) // Límite por página
+    ]);
+
+    res.status(200).json({
+      total, // Total de enfermeros
+      page: Number(page), // Página actual
+      limit: Number(limit), // Límite por página
+      nurses // Lista de enfermeros
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error en el servidor', error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /nurses/search:
+ *   get:
+ *     summary: Búsqueda de enfermeros con filtros y paginación
+ *     tags: [Nurses]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: especialidad
+ *         schema:
+ *           type: string
+ *         description: Especialidad del enfermero (p. ej., geriatría, cuidados intensivos)
+ *       - in: query
+ *         name: ubicacion
+ *         schema:
+ *           type: string
+ *         description: Ubicación del enfermero para facilitar desplazamientos
+ *       - in: query
+ *         name: tarifa
+ *         schema:
+ *           type: number
+ *         description: Tarifa máxima diaria del enfermero
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Número de página (por defecto 1)
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Número de resultados por página (por defecto 10)
+ *     responses:
+ *       200:
+ *         description: Lista de enfermeros que cumplen con los filtros
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 total:
+ *                   type: integer
+ *                 page:
+ *                   type: integer
+ *                 limit:
+ *                   type: integer
+ *                 nurses:
+ *                   type: array
+ *                   items:
+ *                     properties:
+ *                       name:
+ *                         type: string
+ *                       especialidad:
+ *                         type: string
+ *                       ubicacion:
+ *                         type: string
+ *                       tarifa:
+ *                         type: number
+ *       500:
+ *         description: Error en el servidor
+ */
+router.get('/search', authenticateToken, async (req, res) => {
+  const { especialidad, ubicacion, tarifa, page = 1, limit = 10 } = req.query;
+
+  const filters = {};
+  if (especialidad) filters.especialidad = especialidad;
+  if (ubicacion) filters.ubicacion = ubicacion;
+  if (tarifa) filters.tarifa = { $lte: tarifa };
+
+  try {
+    const skip = (page - 1) * limit;
+
+    const [total, nurses] = await Promise.all([
+      Nurse.countDocuments(filters), // Total de enfermeros que cumplen con los filtros
+      Nurse.find(filters, '-user_name -password -_id') // Excluir campos sensibles
+        .skip(skip) // Paginación
+        .limit(Number(limit)) // Límite por página
+    ]);
+
+    res.status(200).json({
+      total, // Total de resultados
+      page: Number(page), // Página actual
+      limit: Number(limit), // Límite por página
+      nurses // Lista de enfermeros
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error en el servidor', error: error.message });
+  }
+});
+
+// Los demás endpoints permanecen sin cambios
+
+/**
+ * @swagger
+ * /nurses/register:
+ *   post:
+ *     summary: Registro de enfermero
+ *     tags: [Nurses]
  *     requestBody:
  *       required: true
  *       content:
@@ -27,37 +380,98 @@ const router = express.Router();
  *             properties:
  *               name:
  *                 type: string
+ *                 example: "Juan Pérez"
+ *               fecha_nacimiento:
+ *                 type: string
+ *                 format: date
+ *                 example: "1990-05-15"
+ *               genero:
+ *                 type: string
+ *                 example: "Masculino"
+ *               especialidad:
+ *                 type: string
+ *                 example: "Geriatría"
+ *               ubicacion:
+ *                 type: string
+ *                 example: "Madrid"
+ *               tarifa:
+ *                 type: number
+ *                 example: 50
+ *               disponibilidad:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     dia:
+ *                       type: string
+ *                       example: "Lunes"
+ *                     horaInicio:
+ *                       type: string
+ *                       example: "08:00"
+ *                     horaFin:
+ *                       type: string
+ *                       example: "17:00"
  *               user_name:
  *                 type: string
+ *                 example: "juanperez"
  *               password:
  *                 type: string
- *               foto:
- *                 type: string
- *               verificado:
- *                 type: string
+ *                 example: "password123"
  *     responses:
  *       201:
- *         description: Usuario registrado exitosamente
+ *         description: Enfermero registrado exitosamente
  *       400:
- *         description: Error en el registro
+ *         description: Error en el registro del enfermero
  */
+
 router.post('/register', async (req, res) => {
   try {
-    const newUser = new User(req.body);
-    await newUser.save();
-    const token = generateToken(newUser._id);
-    res.status(201).json({ user: newUser, token });
+    const {
+      name,
+      fecha_nacimiento,
+      genero,
+      especialidad,
+      ubicacion,
+      tarifa,
+      disponibilidad,
+      user_name,
+      password,
+      descripcion,
+      certificados
+    } = req.body;
+
+    const newNurse = new Nurse({
+      name,
+      fecha_nacimiento,
+      genero,
+      especialidad,
+      ubicacion,
+      tarifa,
+      disponibilidad,
+      user_name,
+      password,
+      descripcion,
+      certificados
+    });
+
+    await newNurse.save();
+
+    const token = generateToken(newNurse._id);
+    res.status(201).json({
+      message: 'Enfermero registrado exitosamente',
+      nurse: newNurse,
+      token: `Bearer ${token}`
+    });
   } catch (error) {
-    res.status(400).json({ message: 'Error al registrar el usuario', error: error.message });
+    res.status(400).json({ message: 'Error en el registro del enfermero', error: error.message });
   }
 });
-
 /**
  * @swagger
- * /users/login:
+ * /nurses/login:
  *   post:
- *     summary: Inicio de sesión de usuario
- *     tags: [Users]
+ *     summary: Inicio de sesión de enfermero
+ *     tags: [Nurses]
  *     requestBody:
  *       required: true
  *       content:
@@ -67,10 +481,8 @@ router.post('/register', async (req, res) => {
  *             properties:
  *               user_name:
  *                 type: string
- *                 description: "Nombre de usuario o correo electrónico del usuario"
  *               password:
  *                 type: string
- *                 description: "Contraseña del usuario"
  *     responses:
  *       200:
  *         description: Inicio de sesión exitoso
@@ -81,27 +493,47 @@ router.post('/login', async (req, res) => {
   const { user_name, password } = req.body;
 
   try {
-    const user = await User.findOne({ user_name, password });
-    if (!user) {
+    const nurse = await Nurse.findOne({ user_name, password });
+    if (!nurse) {
       return res.status(401).json({ message: 'Credenciales incorrectas' });
     }
 
-    const token = generateToken({ userId: user._id, role: 'usuario' });
-    res.json({ token, role: 'usuario' });
+    const token = generateToken({ userId: nurse._id, role: 'enfermero' });
+    res.json({ token, role: 'enfermero' });
   } catch (error) {
     res.status(500).json({ message: 'Error en el inicio de sesión', error: error.message });
   }
 });
 
+module.exports = router;
+routes\patients.js:
+const express = require('express');
+const Patient = require('../models/Patient');
+const { authenticateToken } = require('../middleware/auth');
+
+const router = express.Router();
+
 /**
  * @swagger
- * /users:
+ * tags:
+ *   name: Patients
+ *   description: Endpoints para la gestión de pacientes
+ */
+
+/**
+ * @swagger
+ * /patients:
  *   get:
- *     summary: Obtener una lista de usuarios con paginación
- *     tags: [Users]
+ *     summary: Obtener pacientes del usuario autenticado con paginación
+ *     tags: [Patients]
  *     security:
  *       - bearerAuth: []
  *     parameters:
+ *       - in: query
+ *         name: user_id
+ *         schema:
+ *           type: string
+ *         description: ID del usuario
  *       - in: query
  *         name: page
  *         schema:
@@ -116,7 +548,7 @@ router.post('/login', async (req, res) => {
  *         description: Número de elementos por página (por defecto 10)
  *     responses:
  *       200:
- *         description: Lista de usuarios con paginación
+ *         description: Lista de pacientes del usuario autenticado
  *         content:
  *           application/json:
  *             schema:
@@ -124,100 +556,220 @@ router.post('/login', async (req, res) => {
  *               properties:
  *                 total:
  *                   type: integer
- *                   description: Número total de usuarios
+ *                   description: Número total de pacientes
  *                 page:
  *                   type: integer
  *                   description: Página actual
  *                 limit:
  *                   type: integer
- *                   description: Límite de elementos por página
- *                 users:
+ *                   description: Límite de pacientes por página
+ *                 patients:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/User'
+ *                     properties:
+ *                       name:
+ *                         type: string
+ *                       fecha_nacimiento:
+ *                         type: string
+ *                       genero:
+ *                         type: string
+ *                       movilidad:
+ *                         type: string
+ *                       descripcion:
+ *                         type: string
+ *       400:
+ *         description: Error en la solicitud
  *       500:
- *         description: Error del servidor
+ *         description: Error al obtener los pacientes
  */
 router.get('/', authenticateToken, async (req, res) => {
-  try {
-    const { page = 1, limit = 10 } = req.query;
+  const { user_id, page = 1, limit = 10 } = req.query;
 
+  if (!user_id) {
+    return res.status(400).json({ message: 'El campo user_id es obligatorio' });
+  }
+
+  try {
     const skip = (page - 1) * limit;
 
-    const users = await User.find()
-      .skip(skip)
-      .limit(Number(limit));
+    const [total, patients] = await Promise.all([
+      Patient.countDocuments({ usuario_id: user_id }),
+      Patient.find({ usuario_id: user_id })
+        .skip(skip)
+        .limit(Number(limit))
+    ]);
 
-    const total = await User.countDocuments();
+    const patientsWithoutID = patients.map(patient => {
+      const { _id, ...patientData } = patient.toObject();
+      return patientData;
+    });
 
     res.status(200).json({
       total,
       page: Number(page),
       limit: Number(limit),
-      users
+      patients: patientsWithoutID
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error en el servidor', error: error.message });
+    res.status(500).json({ message: 'Error al obtener los pacientes', error: error.message });
   }
 });
 
 /**
  * @swagger
- * /users/panel:
- *   get:
- *     summary: Acceso al panel principal del usuario
- *     tags: [Users]
+ * /patients:
+ *   post:
+ *     summary: Agregar un nuevo paciente
+ *     tags: [Patients]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               user_id:
+ *                 type: string
+ *                 description: ID del usuario
+ *               name:
+ *                 type: string
+ *               fecha_nacimiento:
+ *                 type: string
+ *               genero:
+ *                 type: string
+ *               movilidad:
+ *                 type: string
+ *               descripcion:
+ *                 type: string
  *     responses:
- *       200:
- *         description: Acceso al panel principal del usuario autenticado
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
+ *       201:
+ *         description: Paciente agregado exitosamente
+ *       400:
+ *         description: Error al crear el paciente
+ */
+router.post('/', authenticateToken, async (req, res) => {
+  const { user_id, name, fecha_nacimiento, genero, movilidad, descripcion } = req.body;
+
+  if (!user_id) {
+    return res.status(400).json({ message: 'El campo user_id es obligatorio' });
+  }
+
+  try {
+    const newPatient = new Patient({
+      usuario_id: user_id,
+      name,
+      fecha_nacimiento,
+      genero,
+      movilidad,
+      descripcion
+    });
+
+    await newPatient.save();
+
+    const { _id, ...patientData } = newPatient.toObject(); // Excluir `_id` de la respuesta
+    res.status(201).json(patientData);
+  } catch (error) {
+    res.status(400).json({ message: 'Error al crear el paciente', error: error.message });
+  }
+});
+
+module.exports = router;
+routes\reviews.js:
+const express = require('express');
+const ServiceRequest = require('../models/ServiceRequest');
+const Patient = require('../models/Patient');
+const User = require('../models/User');
+const Nurse = require('../models/Nurse');
+const { authenticateToken } = require('../middleware/auth');
+
+const router = express.Router();
+
+/**
+ * @swagger
+ * tags:
+ *   name: ServiceRequests
+ *   description: Endpoints para la gestión de solicitudes de servicio de enfermería
+ */
+
+/**
+ * @swagger
+ * /service-requests:
+ *   post:
+ *     summary: Crear una nueva solicitud de servicio
+ *     tags: [ServiceRequests]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               nurse_id:
+ *                 type: string
+ *                 description: "ID del enfermero asignado"
+ *               patient_ids:
+ *                 type: array
+ *                 items:
  *                   type: string
- *                   example: "Bienvenido al panel principal"
- *                 opciones:
- *                   type: array
- *                   items:
- *                     type: string
- *                   example: ["Buscar Enfermeros", "Mis Pacientes"]
- *       401:
- *         description: No autorizado, token no proporcionado o inválido
+ *                 description: "IDs de los pacientes seleccionados para el servicio"
+ *               detalles:
+ *                 type: string
+ *               fecha:
+ *                 type: string
+ *                 format: date
+ *               tarifa:
+ *                 type: number
+ *     responses:
+ *       201:
+ *         description: Solicitud de servicio creada exitosamente
+ *       400:
+ *         description: Error al crear la solicitud de servicio
  */
-router.get('/panel', authenticateToken, (req, res) => {
-  res.status(200).json({
-    message: "Bienvenido al panel principal",
-    opciones: ["Buscar Enfermeros", "Mis Pacientes"]
-  });
+router.post('/', authenticateToken, async (req, res) => {
+  const { nurse_id, patient_ids, detalles, fecha, tarifa } = req.body;
+
+  try {
+    // Verificar que los pacientes pertenecen al usuario autenticado
+    const validPatients = await Patient.find({ _id: { $in: patient_ids }, usuario_id: req.userId });
+    if (validPatients.length !== patient_ids.length) {
+      return res.status(403).json({ message: 'Acceso denegado a uno o más pacientes seleccionados' });
+    }
+
+    const newRequest = new ServiceRequest({
+      user_id: req.userId,
+      nurse_id,
+      patient_ids,
+      detalles,
+      fecha,
+      tarifa
+    });
+
+    await newRequest.save();
+    res.status(201).json(newRequest);
+  } catch (error) {
+    res.status(400).json({ message: 'Error al crear la solicitud de servicio', error: error.message });
+  }
 });
 
-module.exports = router;
-routes\transactions.js:
-const express = require('express');
-const FAQ = require('../models/FAQ');
-const SupportRequest = require('../models/SupportRequest');
-const { authenticateToken } = require('../middleware/auth');
-
-const router = express.Router();
-
 /**
  * @swagger
- * tags:
- *   name: Support
- *   description: Endpoints para soporte técnico y ayuda
- */
-
-/**
- * @swagger
- * /support/faq:
+ * /service-requests:
  *   get:
- *     summary: Obtener la lista de preguntas frecuentes (FAQ) con paginación
- *     tags: [Support]
+ *     summary: Obtener todas las solicitudes del usuario o enfermero autenticado con paginación
+ *     tags: [ServiceRequests]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
+ *       - in: query
+ *         name: estado
+ *         schema:
+ *           type: string
+ *           enum: [pendiente, aceptada, completada]
+ *         description: Filtrar solicitudes por estado
  *       - in: query
  *         name: page
  *         schema:
@@ -232,7 +784,7 @@ const router = express.Router();
  *         description: Número de elementos por página (por defecto 10)
  *     responses:
  *       200:
- *         description: Lista de preguntas frecuentes
+ *         description: Lista de solicitudes de servicio
  *         content:
  *           application/json:
  *             schema:
@@ -240,49 +792,65 @@ const router = express.Router();
  *               properties:
  *                 total:
  *                   type: integer
- *                   description: Total de preguntas frecuentes
  *                 page:
  *                   type: integer
- *                   description: Página actual
  *                 limit:
  *                   type: integer
- *                   description: Límite de preguntas por página
- *                 faqs:
+ *                 requests:
  *                   type: array
  *                   items:
- *                     properties:
- *                       pregunta:
- *                         type: string
- *                       respuesta:
- *                         type: string
+ *                     $ref: '#/components/schemas/ServiceRequest'
+ *       500:
+ *         description: Error al obtener las solicitudes
  */
-router.get('/faq', async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
+  const { estado, page = 1, limit = 10 } = req.query;
+
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const filter = {
+      $or: [{ user_id: req.userId }, { nurse_id: req.userId }]
+    };
+
+    if (estado) {
+      filter.estado = estado;
+    }
+
     const skip = (page - 1) * limit;
 
-    const faqs = await FAQ.find().skip(skip).limit(Number(limit));
-    const total = await FAQ.countDocuments();
+    const [total, requests] = await Promise.all([
+      ServiceRequest.countDocuments(filter),
+      ServiceRequest.find(filter)
+        .skip(skip)
+        .limit(Number(limit))
+        .populate('patient_ids', 'name fecha_nacimiento genero descripcion')
+    ]);
 
     res.status(200).json({
       total,
       page: Number(page),
       limit: Number(limit),
-      faqs
+      requests
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener las preguntas frecuentes', error: error.message });
+    res.status(500).json({ message: 'Error al obtener las solicitudes', error: error.message });
   }
 });
 
 /**
  * @swagger
- * /support/request:
- *   post:
- *     summary: Enviar una solicitud de soporte técnico
- *     tags: [Support]
+ * /service-requests/{id}:
+ *   put:
+ *     summary: Actualizar el estado de una solicitud
+ *     tags: [ServiceRequests]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID de la solicitud de servicio
  *     requestBody:
  *       required: true
  *       content:
@@ -290,174 +858,75 @@ router.get('/faq', async (req, res) => {
  *           schema:
  *             type: object
  *             properties:
- *               asunto:
+ *               estado:
  *                 type: string
- *                 description: "Asunto de la solicitud de soporte"
- *               mensaje:
- *                 type: string
- *                 description: "Descripción detallada del problema"
- *     responses:
- *       201:
- *         description: Solicitud de soporte enviada exitosamente
- *       400:
- *         description: Error al enviar la solicitud de soporte
- */
-router.post('/request', authenticateToken, async (req, res) => {
-  const { asunto, mensaje } = req.body;
-
-  try {
-    if (!asunto || !mensaje) {
-      return res.status(400).json({ message: 'El asunto y el mensaje son obligatorios' });
-    }
-
-    const supportRequest = new SupportRequest({
-      user_id: req.userId,
-      tipo_usuario: req.userRole, // Asume que el middleware agrega el rol
-      asunto,
-      mensaje
-    });
-
-    await supportRequest.save();
-
-    res.status(201).json({
-      message: 'Solicitud de soporte enviada exitosamente',
-      supportRequest
-    });
-  } catch (error) {
-    res.status(400).json({ message: 'Error al enviar la solicitud de soporte', error: error.message });
-  }
-});
-
-module.exports = router;
-routes\support.js:
-const express = require('express');
-const FAQ = require('../models/FAQ');
-const SupportRequest = require('../models/SupportRequest');
-const { authenticateToken } = require('../middleware/auth');
-
-const router = express.Router();
-
-/**
- * @swagger
- * tags:
- *   name: Support
- *   description: Endpoints para soporte técnico y ayuda
- */
-
-/**
- * @swagger
- * /support/faq:
- *   get:
- *     summary: Obtener la lista de preguntas frecuentes (FAQ) con paginación
- *     tags: [Support]
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Número de la página (por defecto 1)
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Número de elementos por página (por defecto 10)
+ *                 enum: [pendiente, aceptada, rechazada, completada]
+ *                 description: Nuevo estado de la solicitud
  *     responses:
  *       200:
- *         description: Lista de preguntas frecuentes
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 total:
- *                   type: integer
- *                   description: Total de preguntas frecuentes
- *                 page:
- *                   type: integer
- *                   description: Página actual
- *                 limit:
- *                   type: integer
- *                   description: Límite de preguntas por página
- *                 faqs:
- *                   type: array
- *                   items:
- *                     properties:
- *                       pregunta:
- *                         type: string
- *                       respuesta:
- *                         type: string
+ *         description: Estado de la solicitud actualizado exitosamente
+ *       400:
+ *         description: Error al actualizar la solicitud
  */
-router.get('/faq', async (req, res) => {
+router.put('/:id', authenticateToken, async (req, res) => {
+  const { estado } = req.body;
+
+  if (!['pendiente', 'aceptada', 'rechazada', 'completada'].includes(estado)) {
+    return res.status(400).json({ message: 'Estado inválido' });
+  }
+
   try {
-    const { page = 1, limit = 10 } = req.query;
-    const skip = (page - 1) * limit;
+    const serviceRequest = await ServiceRequest.findOneAndUpdate(
+      { _id: req.params.id, nurse_id: req.userId },
+      { estado },
+      { new: true }
+    );
 
-    const faqs = await FAQ.find().skip(skip).limit(Number(limit));
-    const total = await FAQ.countDocuments();
+    if (!serviceRequest) {
+      return res.status(404).json({ message: 'Solicitud de servicio no encontrada' });
+    }
 
-    res.status(200).json({
-      total,
-      page: Number(page),
-      limit: Number(limit),
-      faqs
-    });
+    res.status(200).json({ message: `Solicitud ${estado} exitosamente`, serviceRequest });
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener las preguntas frecuentes', error: error.message });
+    res.status(400).json({ message: 'Error al actualizar la solicitud', error: error.message });
   }
 });
 
 /**
  * @swagger
- * /support/request:
- *   post:
- *     summary: Enviar una solicitud de soporte técnico
- *     tags: [Support]
+ * /service-requests/{id}:
+ *   get:
+ *     summary: Obtener detalles de una solicitud específica
+ *     tags: [ServiceRequests]
  *     security:
  *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               asunto:
- *                 type: string
- *                 description: "Asunto de la solicitud de soporte"
- *               mensaje:
- *                 type: string
- *                 description: "Descripción detallada del problema"
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID de la solicitud
  *     responses:
- *       201:
- *         description: Solicitud de soporte enviada exitosamente
- *       400:
- *         description: Error al enviar la solicitud de soporte
+ *       200:
+ *         description: Detalles de la solicitud
+ *       404:
+ *         description: Solicitud no encontrada
  */
-router.post('/request', authenticateToken, async (req, res) => {
-  const { asunto, mensaje } = req.body;
-
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
-    if (!asunto || !mensaje) {
-      return res.status(400).json({ message: 'El asunto y el mensaje son obligatorios' });
+    const serviceRequest = await ServiceRequest.findOne({
+      _id: req.params.id,
+      $or: [{ user_id: req.userId }, { nurse_id: req.userId }]
+    }).populate('patient_ids', 'name fecha_nacimiento genero descripcion');
+
+    if (!serviceRequest) {
+      return res.status(404).json({ message: 'Solicitud no encontrada' });
     }
 
-    const supportRequest = new SupportRequest({
-      user_id: req.userId,
-      tipo_usuario: req.userRole, // Asume que el middleware agrega el rol
-      asunto,
-      mensaje
-    });
-
-    await supportRequest.save();
-
-    res.status(201).json({
-      message: 'Solicitud de soporte enviada exitosamente',
-      supportRequest
-    });
+    res.status(200).json(serviceRequest);
   } catch (error) {
-    res.status(400).json({ message: 'Error al enviar la solicitud de soporte', error: error.message });
+    res.status(500).json({ message: 'Error al obtener los detalles de la solicitud', error: error.message });
   }
 });
 
@@ -717,10 +1186,10 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 module.exports = router;
-routes\reviews.js:
+routes\support.js:
 const express = require('express');
-const Review = require('../models/Review');
-const ServiceRequest = require('../models/ServiceRequest');
+const FAQ = require('../models/FAQ');
+const SupportRequest = require('../models/SupportRequest');
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
@@ -728,93 +1197,17 @@ const router = express.Router();
 /**
  * @swagger
  * tags:
- *   name: Reviews
- *   description: Endpoints para gestión de reseñas y calificaciones
+ *   name: Support
+ *   description: Endpoints para soporte técnico y ayuda
  */
 
 /**
  * @swagger
- * /reviews:
- *   post:
- *     summary: Crear una reseña y calificación para un enfermero
- *     tags: [Reviews]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               nurse_id:
- *                 type: string
- *                 description: "ID del enfermero evaluado"
- *               service_request_id:
- *                 type: string
- *                 description: "ID de la solicitud de servicio completada"
- *               calificacion:
- *                 type: number
- *                 minimum: 1
- *                 maximum: 5
- *                 description: "Calificación de 1 a 5"
- *               comentario:
- *                 type: string
- *                 description: "Comentario opcional sobre el servicio"
- *     responses:
- *       201:
- *         description: Reseña creada exitosamente
- *       400:
- *         description: Error al crear la reseña
- */
-router.post('/', authenticateToken, async (req, res) => {
-  const { nurse_id, service_request_id, calificacion, comentario } = req.body;
-
-  try {
-    // Verificar que el servicio fue completado
-    const serviceRequest = await ServiceRequest.findOne({
-      _id: service_request_id,
-      user_id: req.userId,
-      nurse_id,
-      estado: 'completado'
-    });
-
-    if (!serviceRequest) {
-      return res.status(400).json({ message: 'No se puede evaluar un servicio que no ha sido completado' });
-    }
-
-    // Crear la reseña
-    const review = new Review({
-      nurse_id,
-      user_id: req.userId,
-      service_request_id,
-      calificacion,
-      comentario
-    });
-
-    await review.save();
-
-    res.status(201).json({ message: 'Reseña creada exitosamente', review });
-  } catch (error) {
-    res.status(400).json({ message: 'Error al crear la reseña', error: error.message });
-  }
-});
-
-/**
- * @swagger
- * /reviews/{nurse_id}:
+ * /support/faq:
  *   get:
- *     summary: Obtener todas las reseñas y calificaciones de un enfermero con paginación
- *     tags: [Reviews]
- *     security:
- *       - bearerAuth: []
+ *     summary: Obtener la lista de preguntas frecuentes (FAQ) con paginación
+ *     tags: [Support]
  *     parameters:
- *       - in: path
- *         name: nurse_id
- *         required: true
- *         schema:
- *           type: string
- *         description: ID del enfermero para obtener sus reseñas
  *       - in: query
  *         name: page
  *         schema:
@@ -829,7 +1222,7 @@ router.post('/', authenticateToken, async (req, res) => {
  *         description: Número de elementos por página (por defecto 10)
  *     responses:
  *       200:
- *         description: Lista de reseñas y calificaciones del enfermero
+ *         description: Lista de preguntas frecuentes
  *         content:
  *           application/json:
  *             schema:
@@ -837,178 +1230,47 @@ router.post('/', authenticateToken, async (req, res) => {
  *               properties:
  *                 total:
  *                   type: integer
- *                 page:
- *                   type: integer
- *                 limit:
- *                   type: integer
- *                 reviews:
- *                   type: array
- *                   items:
- *                     properties:
- *                       calificacion:
- *                         type: number
- *                       comentario:
- *                         type: string
- *                       createdAt:
- *                         type: string
- *                         format: date-time
- *       403:
- *         description: Acceso denegado
- *       404:
- *         description: Enfermero no encontrado o sin reseñas
- */
-router.get('/:nurse_id', authenticateToken, async (req, res) => {
-  const { page = 1, limit = 10 } = req.query;
-
-  try {
-    const nurse_id = req.params.nurse_id;
-
-    // Verificar que el usuario autenticado es el enfermero que consulta las reseñas
-    if (req.userId !== nurse_id) {
-      return res.status(403).json({ message: 'Acceso denegado' });
-    }
-
-    const skip = (page - 1) * limit;
-
-    const [total, reviews] = await Promise.all([
-      Review.countDocuments({ nurse_id }),
-      Review.find({ nurse_id })
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(Number(limit))
-    ]);
-
-    if (!reviews.length) {
-      return res.status(404).json({ message: 'No se encontraron reseñas para este enfermero' });
-    }
-
-    res.status(200).json({
-      total,
-      page: Number(page),
-      limit: Number(limit),
-      reviews
-    });
-  } catch (error) {
-    res.status(400).json({ message: 'Error al obtener las reseñas', error: error.message });
-  }
-});
-
-module.exports = router;
-routes\patients.js:
-const express = require('express');
-const Patient = require('../models/Patient');
-const { authenticateToken } = require('../middleware/auth');
-
-const router = express.Router();
-
-/**
- * @swagger
- * tags:
- *   name: Patients
- *   description: Endpoints para la gestión de pacientes
- */
-
-/**
- * @swagger
- * /patients:
- *   get:
- *     summary: Obtener pacientes del usuario autenticado con paginación
- *     tags: [Patients]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: user_id
- *         schema:
- *           type: string
- *         description: ID del usuario
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Número de la página (por defecto 1)
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Número de elementos por página (por defecto 10)
- *     responses:
- *       200:
- *         description: Lista de pacientes del usuario autenticado
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 total:
- *                   type: integer
- *                   description: Número total de pacientes
+ *                   description: Total de preguntas frecuentes
  *                 page:
  *                   type: integer
  *                   description: Página actual
  *                 limit:
  *                   type: integer
- *                   description: Límite de pacientes por página
- *                 patients:
+ *                   description: Límite de preguntas por página
+ *                 faqs:
  *                   type: array
  *                   items:
  *                     properties:
- *                       name:
+ *                       pregunta:
  *                         type: string
- *                       fecha_nacimiento:
+ *                       respuesta:
  *                         type: string
- *                       genero:
- *                         type: string
- *                       movilidad:
- *                         type: string
- *                       descripcion:
- *                         type: string
- *       400:
- *         description: Error en la solicitud
- *       500:
- *         description: Error al obtener los pacientes
  */
-router.get('/', authenticateToken, async (req, res) => {
-  const { user_id, page = 1, limit = 10 } = req.query;
-
-  if (!user_id) {
-    return res.status(400).json({ message: 'El campo user_id es obligatorio' });
-  }
-
+router.get('/faq', async (req, res) => {
   try {
+    const { page = 1, limit = 10 } = req.query;
     const skip = (page - 1) * limit;
 
-    const [total, patients] = await Promise.all([
-      Patient.countDocuments({ usuario_id: user_id }),
-      Patient.find({ usuario_id: user_id })
-        .skip(skip)
-        .limit(Number(limit))
-    ]);
-
-    const patientsWithoutID = patients.map(patient => {
-      const { _id, ...patientData } = patient.toObject();
-      return patientData;
-    });
+    const faqs = await FAQ.find().skip(skip).limit(Number(limit));
+    const total = await FAQ.countDocuments();
 
     res.status(200).json({
       total,
       page: Number(page),
       limit: Number(limit),
-      patients: patientsWithoutID
+      faqs
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener los pacientes', error: error.message });
+    res.status(500).json({ message: 'Error al obtener las preguntas frecuentes', error: error.message });
   }
 });
 
 /**
  * @swagger
- * /patients:
+ * /support/request:
  *   post:
- *     summary: Agregar un nuevo paciente
- *     tags: [Patients]
+ *     summary: Enviar una solicitud de soporte técnico
+ *     tags: [Support]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -1018,72 +1280,65 @@ router.get('/', authenticateToken, async (req, res) => {
  *           schema:
  *             type: object
  *             properties:
- *               user_id:
+ *               asunto:
  *                 type: string
- *                 description: ID del usuario
- *               name:
+ *                 description: "Asunto de la solicitud de soporte"
+ *               mensaje:
  *                 type: string
- *               fecha_nacimiento:
- *                 type: string
- *               genero:
- *                 type: string
- *               movilidad:
- *                 type: string
- *               descripcion:
- *                 type: string
+ *                 description: "Descripción detallada del problema"
  *     responses:
  *       201:
- *         description: Paciente agregado exitosamente
+ *         description: Solicitud de soporte enviada exitosamente
  *       400:
- *         description: Error al crear el paciente
+ *         description: Error al enviar la solicitud de soporte
  */
-router.post('/', authenticateToken, async (req, res) => {
-  const { user_id, name, fecha_nacimiento, genero, movilidad, descripcion } = req.body;
-
-  if (!user_id) {
-    return res.status(400).json({ message: 'El campo user_id es obligatorio' });
-  }
+router.post('/request', authenticateToken, async (req, res) => {
+  const { asunto, mensaje } = req.body;
 
   try {
-    const newPatient = new Patient({
-      usuario_id: user_id,
-      name,
-      fecha_nacimiento,
-      genero,
-      movilidad,
-      descripcion
+    if (!asunto || !mensaje) {
+      return res.status(400).json({ message: 'El asunto y el mensaje son obligatorios' });
+    }
+
+    const supportRequest = new SupportRequest({
+      user_id: req.userId,
+      tipo_usuario: req.userRole, // Asume que el middleware agrega el rol
+      asunto,
+      mensaje
     });
 
-    await newPatient.save();
+    await supportRequest.save();
 
-    const { _id, ...patientData } = newPatient.toObject(); // Excluir `_id` de la respuesta
-    res.status(201).json(patientData);
+    res.status(201).json({
+      message: 'Solicitud de soporte enviada exitosamente',
+      supportRequest
+    });
   } catch (error) {
-    res.status(400).json({ message: 'Error al crear el paciente', error: error.message });
+    res.status(400).json({ message: 'Error al enviar la solicitud de soporte', error: error.message });
   }
 });
 
 module.exports = router;
-routes\nurses.js:
+routes\transactions.js:
 const express = require('express');
-const Nurse = require('../models/Nurse');
-const { authenticateToken, generateToken } = require('../middleware/auth');
+const Transaction = require('../models/Transaction');
+const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
 /**
  * @swagger
  * tags:
- *   name: Nurses
- *   description: Endpoints para la gestión de enfermeros
+ *   name: Transactions
+ *   description: Endpoints para la gestión de pagos y facturación
  */
 
 /**
  * @swagger
- * /nurses:
+ * /transactions:
  *   get:
- *     summary: Obtener enfermeros (sin datos sensibles) con paginación
- *     tags: [Nurses]
+ *     summary: Obtener el historial de pagos recibidos por el enfermero con paginación
+ *     tags: [Transactions]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -1092,16 +1347,16 @@ const router = express.Router();
  *         schema:
  *           type: integer
  *           default: 1
- *         description: Número de página (por defecto 1)
+ *         description: Número de la página (por defecto 1)
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
  *           default: 10
- *         description: Número de resultados por página (por defecto 10)
+ *         description: Número de elementos por página (por defecto 10)
  *     responses:
  *       200:
- *         description: Lista de enfermeros
+ *         description: Historial de pagos del enfermero con paginación
  *         content:
  *           application/json:
  *             schema:
@@ -1109,165 +1364,131 @@ const router = express.Router();
  *               properties:
  *                 total:
  *                   type: integer
+ *                   description: Número total de transacciones
  *                 page:
  *                   type: integer
+ *                   description: Página actual
  *                 limit:
  *                   type: integer
- *                 nurses:
+ *                   description: Límite de elementos por página
+ *                 transactions:
  *                   type: array
  *                   items:
  *                     properties:
- *                       name:
+ *                       service_request_id:
  *                         type: string
- *                       fecha_nacimiento:
- *                         type: string
- *                       genero:
- *                         type: string
- *                       descripcion:
- *                         type: string
- *                       especialidad:
- *                         type: string
- *                       ubicacion:
- *                         type: string
- *                       tarifa:
+ *                       monto:
  *                         type: number
- *                       disponibilidad:
- *                         type: array
- *                         items:
- *                           type: string
- *                       certificados:
- *                         type: array
- *                         items:
- *                           type: string
+ *                       fecha_pago:
+ *                         type: string
+ *                         format: date-time
+ *                       estado:
+ *                         type: string
+ *       403:
+ *         description: Acceso denegado
  *       500:
  *         description: Error en el servidor
  */
 router.get('/', authenticateToken, async (req, res) => {
-  const { page = 1, limit = 10 } = req.query;
-
   try {
+    const { page = 1, limit = 10 } = req.query;
+
+    // Calcular el índice de inicio
     const skip = (page - 1) * limit;
 
-    const [total, nurses] = await Promise.all([
-      Nurse.countDocuments(), // Total de enfermeros
-      Nurse.find({}, '-user_name -password -_id') // Excluir campos sensibles
-        .skip(skip) // Paginación: saltar registros
-        .limit(Number(limit)) // Límite por página
-    ]);
+    // Obtener transacciones con paginación
+    const transactions = await Transaction.find({ nurse_id: req.userId })
+      .sort({ fecha_pago: -1 })
+      .skip(skip)
+      .limit(Number(limit));
+
+    // Contar el total de transacciones
+    const total = await Transaction.countDocuments({ nurse_id: req.userId });
 
     res.status(200).json({
-      total, // Total de enfermeros
-      page: Number(page), // Página actual
-      limit: Number(limit), // Límite por página
-      nurses // Lista de enfermeros
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      transactions
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error en el servidor', error: error.message });
+    res.status(500).json({ message: 'Error al obtener el historial de pagos', error: error.message });
   }
 });
 
 /**
  * @swagger
- * /nurses/search:
- *   get:
- *     summary: Búsqueda de enfermeros con filtros y paginación
- *     tags: [Nurses]
+ * /transactions/{id}/factura:
+ *   post:
+ *     summary: Generar una factura para un usuario
+ *     tags: [Transactions]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: especialidad
+ *       - in: path
+ *         name: id
+ *         required: true
  *         schema:
  *           type: string
- *         description: Especialidad del enfermero (p. ej., geriatría, cuidados intensivos)
- *       - in: query
- *         name: ubicacion
- *         schema:
- *           type: string
- *         description: Ubicación del enfermero para facilitar desplazamientos
- *       - in: query
- *         name: tarifa
- *         schema:
- *           type: number
- *         description: Tarifa máxima diaria del enfermero
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Número de página (por defecto 1)
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Número de resultados por página (por defecto 10)
+ *         description: ID de la transacción
  *     responses:
  *       200:
- *         description: Lista de enfermeros que cumplen con los filtros
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 total:
- *                   type: integer
- *                 page:
- *                   type: integer
- *                 limit:
- *                   type: integer
- *                 nurses:
- *                   type: array
- *                   items:
- *                     properties:
- *                       name:
- *                         type: string
- *                       especialidad:
- *                         type: string
- *                       ubicacion:
- *                         type: string
- *                       tarifa:
- *                         type: number
- *       500:
- *         description: Error en el servidor
+ *         description: Factura generada y enviada exitosamente
+ *       404:
+ *         description: Transacción no encontrada
+ *       403:
+ *         description: Acceso denegado
  */
-router.get('/search', authenticateToken, async (req, res) => {
-  const { especialidad, ubicacion, tarifa, page = 1, limit = 10 } = req.query;
-
-  const filters = {};
-  if (especialidad) filters.especialidad = especialidad;
-  if (ubicacion) filters.ubicacion = ubicacion;
-  if (tarifa) filters.tarifa = { $lte: tarifa };
-
+router.post('/:id/factura', authenticateToken, async (req, res) => {
   try {
-    const skip = (page - 1) * limit;
+    // Verificar que la transacción pertenece al enfermero autenticado
+    const transaction = await Transaction.findOne({ _id: req.params.id, nurse_id: req.userId });
 
-    const [total, nurses] = await Promise.all([
-      Nurse.countDocuments(filters), // Total de enfermeros que cumplen con los filtros
-      Nurse.find(filters, '-user_name -password -_id') // Excluir campos sensibles
-        .skip(skip) // Paginación
-        .limit(Number(limit)) // Límite por página
-    ]);
+    if (!transaction) {
+      return res.status(404).json({ message: 'Transacción no encontrada o acceso denegado' });
+    }
 
-    res.status(200).json({
-      total, // Total de resultados
-      page: Number(page), // Página actual
-      limit: Number(limit), // Límite por página
-      nurses // Lista de enfermeros
-    });
+    // Generar la factura (simulado aquí)
+    const factura = {
+      nurse_id: transaction.nurse_id,
+      user_id: transaction.user_id,
+      service_request_id: transaction.service_request_id,
+      monto: transaction.monto,
+      fecha_pago: transaction.fecha_pago,
+      estado: transaction.estado,
+      fecha_factura: new Date(),
+      detalles: 'Servicio de enfermería proporcionado' // Personalizable
+    };
+
+    // Responder con la factura generada
+    res.status(200).json({ message: 'Factura generada y enviada exitosamente', factura });
   } catch (error) {
-    res.status(500).json({ message: 'Error en el servidor', error: error.message });
+    res.status(500).json({ message: 'Error al generar la factura', error: error.message });
   }
 });
 
-// Los demás endpoints permanecen sin cambios
+module.exports = router;
+
+routes\users.js:
+const express = require('express');
+const User = require('../models/User');
+const { generateToken, authenticateToken } = require('../middleware/auth');
+
+const router = express.Router();
 
 /**
  * @swagger
- * /nurses/register:
+ * tags:
+ *   name: Users
+ *   description: Endpoints para la gestión de usuarios
+ */
+
+/**
+ * @swagger
+ * /users/register:
  *   post:
- *     summary: Registro de enfermero
- *     tags: [Nurses]
+ *     summary: Registro de usuario
+ *     tags: [Users]
  *     requestBody:
  *       required: true
  *       content:
@@ -1281,38 +1502,33 @@ router.get('/search', authenticateToken, async (req, res) => {
  *                 type: string
  *               password:
  *                 type: string
- *               especialidad:
+ *               foto:
+ *                 type: string
+ *               verificado:
  *                 type: string
  *     responses:
  *       201:
- *         description: Enfermero registrado exitosamente
+ *         description: Usuario registrado exitosamente
  *       400:
- *         description: Error en el registro del enfermero
+ *         description: Error en el registro
  */
 router.post('/register', async (req, res) => {
   try {
-    const { name, user_name, password, especialidad } = req.body;
-
-    const newNurse = new Nurse({ name, user_name, password, especialidad });
-    await newNurse.save();
-
-    const token = generateToken(newNurse._id);
-    res.status(201).json({
-      message: 'Enfermero registrado exitosamente',
-      nurse: newNurse,
-      token: `Bearer ${token}`
-    });
+    const newUser = new User(req.body);
+    await newUser.save();
+    const token = generateToken(newUser._id);
+    res.status(201).json({ user: newUser, token });
   } catch (error) {
-    res.status(400).json({ message: 'Error en el registro del enfermero', error: error.message });
+    res.status(400).json({ message: 'Error al registrar el usuario', error: error.message });
   }
 });
 
 /**
  * @swagger
- * /nurses/login:
+ * /users/login:
  *   post:
- *     summary: Inicio de sesión de enfermero
- *     tags: [Nurses]
+ *     summary: Inicio de sesión de usuario
+ *     tags: [Users]
  *     requestBody:
  *       required: true
  *       content:
@@ -1322,8 +1538,10 @@ router.post('/register', async (req, res) => {
  *             properties:
  *               user_name:
  *                 type: string
+ *                 description: "Nombre de usuario o correo electrónico del usuario"
  *               password:
  *                 type: string
+ *                 description: "Contraseña del usuario"
  *     responses:
  *       200:
  *         description: Inicio de sesión exitoso
@@ -1334,124 +1552,42 @@ router.post('/login', async (req, res) => {
   const { user_name, password } = req.body;
 
   try {
-    const nurse = await Nurse.findOne({ user_name, password });
-    if (!nurse) {
+    const user = await User.findOne({ user_name, password });
+    if (!user) {
       return res.status(401).json({ message: 'Credenciales incorrectas' });
     }
 
-    const token = generateToken({ userId: nurse._id, role: 'enfermero' });
-    res.json({ token, role: 'enfermero' });
+    const token = generateToken({ userId: user._id, role: 'usuario' });
+    res.json({ token, role: 'usuario' });
   } catch (error) {
     res.status(500).json({ message: 'Error en el inicio de sesión', error: error.message });
   }
 });
 
-module.exports = router;
-routes\messages.js:
-const express = require('express');
-const Message = require('../models/Message');
-const ServiceRequest = require('../models/ServiceRequest');
-const { authenticateToken } = require('../middleware/auth');
-
-const router = express.Router();
-
 /**
  * @swagger
- * tags:
- *   name: Messages
- *   description: Endpoints para la mensajería entre cliente y enfermero
- */
-
-/**
- * @swagger
- * /messages:
- *   post:
- *     summary: Enviar un mensaje en una solicitud de servicio
- *     tags: [Messages]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               service_request_id:
- *                 type: string
- *                 description: "ID de la solicitud de servicio"
- *               receiver_id:
- *                 type: string
- *                 description: "ID del usuario receptor del mensaje"
- *               content:
- *                 type: string
- *                 description: "Contenido del mensaje"
- *     responses:
- *       201:
- *         description: Mensaje enviado exitosamente
- *       400:
- *         description: Error al enviar el mensaje
- */
-router.post('/', authenticateToken, async (req, res) => {
-  const { service_request_id, receiver_id, content } = req.body;
-
-  try {
-    // Verificar que el usuario está involucrado en la solicitud de servicio
-    const serviceRequest = await ServiceRequest.findOne({
-      _id: service_request_id,
-      $or: [{ user_id: req.userId }, { nurse_id: req.userId }]
-    });
-
-    if (!serviceRequest) {
-      return res.status(403).json({ message: 'Acceso denegado' });
-    }
-
-    // Crear y guardar el mensaje
-    const message = new Message({
-      service_request_id,
-      sender_id: req.userId,
-      receiver_id,
-      content
-    });
-
-    await message.save();
-
-    res.status(201).json({ message: 'Mensaje enviado exitosamente', messageData: message });
-  } catch (error) {
-    res.status(400).json({ message: 'Error al enviar el mensaje', error: error.message });
-  }
-});
-
-/**
- * @swagger
- * /messages/{service_request_id}:
+ * /users:
  *   get:
- *     summary: Obtener el historial de mensajes de una solicitud de servicio con paginación
- *     tags: [Messages]
+ *     summary: Obtener una lista de usuarios con paginación
+ *     tags: [Users]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: service_request_id
- *         required: true
- *         schema:
- *           type: string
- *         description: ID de la solicitud de servicio
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
  *           default: 1
- *         description: Número de página (por defecto 1)
+ *         description: Número de la página (por defecto 1)
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
  *           default: 10
- *         description: Número de resultados por página (por defecto 10)
+ *         description: Número de elementos por página (por defecto 10)
  *     responses:
  *       200:
- *         description: Historial de mensajes de la solicitud de servicio
+ *         description: Lista de usuarios con paginación
  *         content:
  *           application/json:
  *             schema:
@@ -1459,73 +1595,75 @@ router.post('/', authenticateToken, async (req, res) => {
  *               properties:
  *                 total:
  *                   type: integer
+ *                   description: Número total de usuarios
  *                 page:
  *                   type: integer
+ *                   description: Página actual
  *                 limit:
  *                   type: integer
- *                 messages:
+ *                   description: Límite de elementos por página
+ *                 users:
  *                   type: array
  *                   items:
- *                     properties:
- *                       sender_id:
- *                         type: string
- *                       receiver_id:
- *                         type: string
- *                       content:
- *                         type: string
- *                       timestamp:
- *                         type: string
- *                         format: date-time
- *       403:
- *         description: Acceso denegado
+ *                     $ref: '#/components/schemas/User'
+ *       500:
+ *         description: Error del servidor
  */
-router.get('/:service_request_id', authenticateToken, async (req, res) => {
-  const { page = 1, limit = 10 } = req.query;
-
+router.get('/', authenticateToken, async (req, res) => {
   try {
-    // Verificar que el usuario está involucrado en la solicitud de servicio
-    const serviceRequest = await ServiceRequest.findOne({
-      _id: req.params.service_request_id,
-      $or: [{ user_id: req.userId }, { nurse_id: req.userId }]
-    });
-
-    if (!serviceRequest) {
-      return res.status(403).json({ message: 'Acceso denegado' });
-    }
+    const { page = 1, limit = 10 } = req.query;
 
     const skip = (page - 1) * limit;
 
-    // Obtener total de mensajes y mensajes paginados
-    const [total, messages] = await Promise.all([
-      Message.countDocuments({ service_request_id: req.params.service_request_id }),
-      Message.find({ service_request_id: req.params.service_request_id })
-        .sort({ timestamp: 1 }) // Ordenar por fecha de creación
-        .skip(skip) // Saltar registros para paginación
-        .limit(Number(limit)) // Límite de registros por página
-    ]);
+    const users = await User.find()
+      .skip(skip)
+      .limit(Number(limit));
+
+    const total = await User.countDocuments();
 
     res.status(200).json({
-      total, // Total de mensajes
-      page: Number(page), // Página actual
-      limit: Number(limit), // Límite por página
-      messages // Lista de mensajes
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      users
     });
   } catch (error) {
-    res.status(400).json({ message: 'Error al obtener el historial de mensajes', error: error.message });
+    res.status(500).json({ message: 'Error en el servidor', error: error.message });
   }
 });
 
-module.exports = router;
-routes\index.js:
-const express = require('express');
-const router = express.Router();
-const usersRoutes = require('./users'); // Asegúrate de que esto esté correcto
-const nursesRoutes = require('./nurses'); // Si lo tienes
-const serviceRequestRoutes = require('./serviceRequests'); // Importa el archivo correcto
-
-// Define las rutas
-router.use('/users', usersRoutes);
-router.use('/nurses', nursesRoutes);
-router.use('/service-requests', serviceRequestRoutes); // Asegúrate de que esto sea correcto
+/**
+ * @swagger
+ * /users/panel:
+ *   get:
+ *     summary: Acceso al panel principal del usuario
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Acceso al panel principal del usuario autenticado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Bienvenido al panel principal"
+ *                 opciones:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   example: ["Buscar Enfermeros", "Mis Pacientes"]
+ *       401:
+ *         description: No autorizado, token no proporcionado o inválido
+ */
+router.get('/panel', authenticateToken, (req, res) => {
+  res.status(200).json({
+    message: "Bienvenido al panel principal",
+    opciones: ["Buscar Enfermeros", "Mis Pacientes"]
+  });
+});
 
 module.exports = router;

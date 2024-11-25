@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SeleniumTestApi")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+994395e7ede556705b12f7352017699f140cd6cb")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+fec154d97e16149d405d053d95bd4c752060dcfe")]
 [assembly: System.Reflection.AssemblyProductAttribute("SeleniumTestApi")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SeleniumTestApi")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
