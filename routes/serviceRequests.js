@@ -27,15 +27,6 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             properties:
- *               user_id:
- *                 type: object
- *                 properties:
- *                   userId:
- *                     type: string
- *                     description: "ID del usuario"
- *                   role:
- *                     type: string
- *                     description: "Rol del usuario"
  *               nurse_id:
  *                 type: string
  *                 description: "ID del enfermero asignado"
@@ -64,16 +55,15 @@ router.post('/', authenticateToken, async (req, res) => {
     // Verificar que los pacientes pertenecen al usuario autenticado
     const validPatients = await Patient.find({
       _id: { $in: patient_ids },
-      usuario_id: req.userId, // Aquí se utiliza el ID del usuario autenticado
+      usuario_id: req.userId, // Usamos el userId extraído del token
     });
 
     if (validPatients.length !== patient_ids.length) {
       return res.status(403).json({ message: 'Acceso denegado a uno o más pacientes seleccionados' });
     }
 
-    // Crear la nueva solicitud con user_id como objeto
     const newRequest = new ServiceRequest({
-      user_id: { userId: req.userId, role: req.userRole }, // Usamos el userId y rol desde el token
+      user_id: { userId: req.userId, role: 'usuario' }, // Asignamos el `userId` y su rol
       nurse_id,
       patient_ids,
       detalles,
@@ -118,23 +108,6 @@ router.post('/', authenticateToken, async (req, res) => {
  *     responses:
  *       200:
  *         description: Lista de solicitudes de servicio
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 total:
- *                   type: integer
- *                 page:
- *                   type: integer
- *                 limit:
- *                   type: integer
- *                 requests:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/ServiceRequest'
- *       500:
- *         description: Error al obtener las solicitudes
  */
 router.get('/', authenticateToken, async (req, res) => {
   const { estado, page = 1, limit = 10 } = req.query;
@@ -142,7 +115,7 @@ router.get('/', authenticateToken, async (req, res) => {
   try {
     const filter = {
       $or: [
-        { 'user_id.userId': req.userId }, // Filtrar por `user_id.userId`
+        { 'user_id.userId': req.userId },
         { nurse_id: req.userId },
       ],
     };
@@ -178,31 +151,6 @@ router.get('/', authenticateToken, async (req, res) => {
  *   put:
  *     summary: Actualizar el estado de una solicitud
  *     tags: [ServiceRequests]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: ID de la solicitud de servicio
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               estado:
- *                 type: string
- *                 enum: [pendiente, aceptada, rechazada, completada]
- *                 description: Nuevo estado de la solicitud
- *     responses:
- *       200:
- *         description: Estado de la solicitud actualizado exitosamente
- *       400:
- *         description: Error al actualizar la solicitud
  */
 router.put('/:id', authenticateToken, async (req, res) => {
   const { estado } = req.body;
@@ -216,7 +164,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
       {
         _id: req.params.id,
         $or: [
-          { 'user_id.userId': req.userId }, // Verificar userId dentro de user_id
+          { 'user_id.userId': req.userId },
           { nurse_id: req.userId },
         ],
       },
@@ -225,7 +173,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
     );
 
     if (!serviceRequest) {
-      return res.status(404).json({ message: 'Solicitud de servicio no encontrada' });
+      return res.status(404).json({ message: 'Solicitud no encontrada' });
     }
 
     res.status(200).json({ message: `Solicitud ${estado} exitosamente`, serviceRequest });
@@ -238,32 +186,17 @@ router.put('/:id', authenticateToken, async (req, res) => {
  * @swagger
  * /service-requests/{id}:
  *   delete:
- *     summary: Eliminar una solicitud de servicio creada por el usuario
- *     tags: [ServiceRequests]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: ID de la solicitud de servicio
- *     responses:
- *       200:
- *         description: Solicitud eliminada exitosamente
- *       404:
- *         description: Solicitud no encontrada
+ *     summary: Eliminar una solicitud de servicio
  */
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const serviceRequest = await ServiceRequest.findOneAndDelete({
       _id: req.params.id,
-      'user_id.userId': req.userId, // Verificar userId dentro de user_id
+      'user_id.userId': req.userId,
     });
 
     if (!serviceRequest) {
-      return res.status(404).json({ message: 'Solicitud de servicio no encontrada' });
+      return res.status(404).json({ message: 'Solicitud no encontrada' });
     }
 
     res.status(200).json({ message: 'Solicitud eliminada exitosamente' });
