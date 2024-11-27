@@ -27,14 +27,17 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             properties:
+ *               user_id:
+ *                 type: string
+ *                 description: ID del usuario
  *               nurse_id:
  *                 type: string
- *                 description: "ID del enfermero asignado"
+ *                 description: ID del enfermero asignado
  *               patient_ids:
  *                 type: array
  *                 items:
  *                   type: string
- *                 description: "IDs de los pacientes seleccionados para el servicio"
+ *                 description: IDs de los pacientes seleccionados
  *               detalles:
  *                 type: string
  *               fecha:
@@ -44,18 +47,22 @@ const router = express.Router();
  *                 type: number
  *     responses:
  *       201:
- *         description: Solicitud de servicio creada exitosamente
+ *         description: Solicitud creada exitosamente
  *       400:
- *         description: Error al crear la solicitud de servicio
+ *         description: Error al crear la solicitud
  */
 router.post('/', authenticateToken, async (req, res) => {
-  const { nurse_id, patient_ids, detalles, fecha, tarifa } = req.body;
+  const { user_id, nurse_id, patient_ids, detalles, fecha, tarifa } = req.body;
+
+  if (!user_id) {
+    return res.status(400).json({ message: 'El campo user_id es obligatorio' });
+  }
 
   try {
-    // Verificar que los pacientes pertenecen al usuario autenticado
+    // Verificar que los pacientes pertenecen al user_id proporcionado
     const validPatients = await Patient.find({
       _id: { $in: patient_ids },
-      usuario_id: String(req.userId), // Asegurarse que usuario_id es un string
+      usuario_id: user_id,
     });
 
     if (validPatients.length !== patient_ids.length) {
@@ -63,7 +70,7 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     const newRequest = new ServiceRequest({
-      user_id: { userId: req.userId, role: 'usuario' },
+      user_id,
       nurse_id,
       patient_ids,
       detalles,
@@ -88,6 +95,11 @@ router.post('/', authenticateToken, async (req, res) => {
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
+ *         name: user_id
+ *         schema:
+ *           type: string
+ *         description: ID del usuario (opcional)
+ *       - in: query
  *         name: estado
  *         schema:
  *           type: string
@@ -110,15 +122,18 @@ router.post('/', authenticateToken, async (req, res) => {
  *         description: Lista de solicitudes de servicio
  */
 router.get('/', authenticateToken, async (req, res) => {
-  const { estado, page = 1, limit = 10 } = req.query;
+  const { user_id, estado, page = 1, limit = 10 } = req.query;
 
   try {
     const filter = {
-      $or: [
-        { 'user_id.userId': req.userId },
-        { nurse_id: req.userId },
-      ],
+      $or: [],
     };
+
+    // Filtrar por user_id proporcionado o nurse_id del token
+    if (user_id) {
+      filter.$or.push({ user_id });
+    }
+    filter.$or.push({ nurse_id: req.userId });
 
     if (estado) {
       filter.estado = estado;
@@ -153,7 +168,11 @@ router.get('/', authenticateToken, async (req, res) => {
  *     tags: [ServiceRequests]
  */
 router.put('/:id', authenticateToken, async (req, res) => {
-  const { estado } = req.body;
+  const { user_id, estado } = req.body;
+
+  if (!user_id) {
+    return res.status(400).json({ message: 'El campo user_id es obligatorio' });
+  }
 
   if (!['pendiente', 'aceptada', 'rechazada', 'completada'].includes(estado)) {
     return res.status(400).json({ message: 'Estado inválido' });
@@ -163,10 +182,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
     const serviceRequest = await ServiceRequest.findOneAndUpdate(
       {
         _id: req.params.id,
-        $or: [
-          { 'user_id.userId': req.userId },
-          { nurse_id: req.userId },
-        ],
+        user_id,
       },
       { estado },
       { new: true }
@@ -189,10 +205,16 @@ router.put('/:id', authenticateToken, async (req, res) => {
  *     summary: Eliminar una solicitud de servicio
  */
 router.delete('/:id', authenticateToken, async (req, res) => {
+  const { user_id } = req.body;
+
+  if (!user_id) {
+    return res.status(400).json({ message: 'El campo user_id es obligatorio' });
+  }
+
   try {
     const serviceRequest = await ServiceRequest.findOneAndDelete({
       _id: req.params.id,
-      'user_id.userId': req.userId,
+      user_id,
     });
 
     if (!serviceRequest) {
