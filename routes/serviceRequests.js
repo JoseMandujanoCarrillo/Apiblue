@@ -1,9 +1,10 @@
-
-const router = express.Router();
+// routes/serviceRequests.js
 const express = require('express');
 const ServiceRequest = require('../models/ServiceRequest');
 const Patient = require('../models/Patient');
 const { authenticateToken } = require('../middleware/auth');
+
+const router = express.Router();
 
 /**
  * @swagger
@@ -86,6 +87,11 @@ router.post('/', authenticateToken, async (req, res) => {
     res.status(400).json({ message: 'Error al crear la solicitud de servicio', error: error.message });
   }
 });
+
+// Otros métodos (GET, PUT, DELETE) permanecen igual...
+
+module.exports = router;
+
 
 /**
  * @swagger
