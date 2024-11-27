@@ -55,7 +55,7 @@ router.post('/', authenticateToken, async (req, res) => {
     // Verificar que los pacientes pertenecen al usuario autenticado
     const validPatients = await Patient.find({
       _id: { $in: patient_ids },
-      usuario_id: req.userId, // Usamos el userId extraído del token
+      usuario_id: String(req.userId), // Asegurarse que usuario_id es un string
     });
 
     if (validPatients.length !== patient_ids.length) {
@@ -63,7 +63,7 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     const newRequest = new ServiceRequest({
-      user_id: { userId: req.userId, role: 'usuario' }, // Asignamos el `userId` y su rol
+      user_id: { userId: req.userId, role: 'usuario' },
       nurse_id,
       patient_ids,
       detalles,
