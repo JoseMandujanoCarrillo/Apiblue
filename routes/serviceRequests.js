@@ -62,7 +62,7 @@ router.post('/', authenticateToken, async (req, res) => {
     // Verificar que los pacientes pertenecen al user_id proporcionado
     const validPatients = await Patient.find({
       _id: { $in: patient_ids },
-      usuario_id: user_id,
+      usuario_id: user_id, // Asegurarse que el `usuario_id` sea válido
     });
 
     if (validPatients.length !== patient_ids.length) {
@@ -70,8 +70,8 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     const newRequest = new ServiceRequest({
-      user_id,
-      nurse_id,
+      user_id, // ID del usuario
+      nurse_id, // ID del enfermero
       patient_ids,
       detalles,
       fecha,
@@ -126,14 +126,14 @@ router.get('/', authenticateToken, async (req, res) => {
 
   try {
     const filter = {
-      $or: [],
+      $or: [], // Inicializamos el filtro vacío
     };
 
     // Filtrar por user_id proporcionado o nurse_id del token
     if (user_id) {
       filter.$or.push({ user_id });
     }
-    filter.$or.push({ nurse_id: req.userId });
+    filter.$or.push({ nurse_id: req.userId }); // Filtrar por nurse_id usando el userId del token
 
     if (estado) {
       filter.estado = estado;
