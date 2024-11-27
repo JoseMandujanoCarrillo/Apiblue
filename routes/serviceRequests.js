@@ -1,4 +1,3 @@
-// routes/serviceRequests.js
 const express = require('express');
 const ServiceRequest = require('../models/ServiceRequest');
 const Patient = require('../models/Patient');
@@ -28,6 +27,9 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             properties:
+ *               user_id:
+ *                 type: string
+ *                 description: "ID del usuario que solicita el servicio"
  *               nurse_id:
  *                 type: string
  *                 description: "ID del enfermero asignado"
@@ -43,9 +45,6 @@ const router = express.Router();
  *                 format: date
  *               tarifa:
  *                 type: number
- *               user_id: 
- *                 type: string
- *                 description: "ID del usuario que está solicitando el servicio"
  *     responses:
  *       201:
  *         description: Solicitud de servicio creada exitosamente
@@ -53,27 +52,22 @@ const router = express.Router();
  *         description: Error al crear la solicitud de servicio
  */
 router.post('/', authenticateToken, async (req, res) => {
-  const { nurse_id, patient_ids, detalles, fecha, tarifa, user_id } = req.body;
+  const { nurse_id, patient_ids, detalles, fecha, tarifa } = req.body;
 
   try {
-    // Verificar que el user_id coincida con el token del usuario autenticado
-    if (user_id !== req.userId) {
-      return res.status(403).json({ message: 'No autorizado a crear la solicitud de servicio para este usuario' });
-    }
-
     // Verificar que los pacientes pertenecen al usuario autenticado
     const validPatients = await Patient.find({
       _id: { $in: patient_ids },
-      usuario_id: user_id, // Ahora estamos usando el user_id directamente
+      usuario_id: req.userId,  // Aquí se utiliza el ID del usuario autenticado
     });
 
     if (validPatients.length !== patient_ids.length) {
       return res.status(403).json({ message: 'Acceso denegado a uno o más pacientes seleccionados' });
     }
 
-    // Crear la solicitud de servicio
+    // Crear la nueva solicitud
     const newRequest = new ServiceRequest({
-      user_id: user_id, // Asegurándote de usar el user_id proporcionado en la solicitud
+      user_id: req.userId,  // Usamos el userId desde el token de autenticación
       nurse_id,
       patient_ids,
       detalles,
@@ -87,11 +81,6 @@ router.post('/', authenticateToken, async (req, res) => {
     res.status(400).json({ message: 'Error al crear la solicitud de servicio', error: error.message });
   }
 });
-
-// Otros métodos (GET, PUT, DELETE) permanecen igual...
-
-module.exports = router;
-
 
 /**
  * @swagger
