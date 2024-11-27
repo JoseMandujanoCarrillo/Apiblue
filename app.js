@@ -6,6 +6,7 @@ const usersRoutes = require('./routes/users');
 const patientsRoutes = require('./routes/patients');
 const nursesRoutes = require('./routes/nurses');
 const serviceRequestRoutes = require('./routes/serviceRequests');
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
