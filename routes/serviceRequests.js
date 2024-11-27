@@ -1,8 +1,6 @@
 const express = require('express');
 const ServiceRequest = require('../models/ServiceRequest');
 const Patient = require('../models/Patient');
-const User = require('../models/User');
-const Nurse = require('../models/Nurse');
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
@@ -55,22 +53,19 @@ router.post('/', authenticateToken, async (req, res) => {
 
   try {
     // Verificar que los pacientes pertenecen al usuario autenticado
-    const validPatients = await Patient.find({
-      _id: { $in: patient_ids },
-      usuario_id: String(req.user.userId) // Asegurarse que el `usuario_id` sea una cadena
-    });
+    const validPatients = await Patient.find({ _id: { $in: patient_ids }, usuario_id: req.userId });
 
     if (validPatients.length !== patient_ids.length) {
       return res.status(403).json({ message: 'Acceso denegado a uno o más pacientes seleccionados' });
     }
 
     const newRequest = new ServiceRequest({
-      user_id: req.user.userId, // Asegúrate de que sea un string
+      user_id: req.userId,
       nurse_id,
       patient_ids,
       detalles,
       fecha,
-      tarifa
+      tarifa,
     });
 
     await newRequest.save();
@@ -84,7 +79,7 @@ router.post('/', authenticateToken, async (req, res) => {
  * @swagger
  * /service-requests:
  *   get:
- *     summary: Obtener todas las solicitudes del usuario o enfermero autenticado con paginación
+ *     summary: Obtener todas las solicitudes del usuario o enfermero autenticado
  *     tags: [ServiceRequests]
  *     security:
  *       - bearerAuth: []
@@ -133,7 +128,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
   try {
     const filter = {
-      $or: [{ user_id: req.user.userId }, { nurse_id: req.user.userId }]
+      $or: [{ user_id: req.userId }, { nurse_id: req.userId }],
     };
 
     if (estado) {
@@ -147,14 +142,14 @@ router.get('/', authenticateToken, async (req, res) => {
       ServiceRequest.find(filter)
         .skip(skip)
         .limit(Number(limit))
-        .populate('patient_ids', 'name fecha_nacimiento genero descripcion')
+        .populate('patient_ids', 'name fecha_nacimiento genero descripcion'),
     ]);
 
     res.status(200).json({
       total,
       page: Number(page),
       limit: Number(limit),
-      requests
+      requests,
     });
   } catch (error) {
     res.status(500).json({ message: 'Error al obtener las solicitudes', error: error.message });
@@ -202,7 +197,10 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
   try {
     const serviceRequest = await ServiceRequest.findOneAndUpdate(
-      { _id: req.params.id, nurse_id: req.user.userId },
+      {
+        _id: req.params.id,
+        $or: [{ user_id: req.userId }, { nurse_id: req.userId }],
+      },
       { estado },
       { new: true }
     );
@@ -220,8 +218,8 @@ router.put('/:id', authenticateToken, async (req, res) => {
 /**
  * @swagger
  * /service-requests/{id}:
- *   get:
- *     summary: Obtener detalles de una solicitud específica
+ *   delete:
+ *     summary: Eliminar una solicitud de servicio creada por el usuario
  *     tags: [ServiceRequests]
  *     security:
  *       - bearerAuth: []
@@ -231,27 +229,27 @@ router.put('/:id', authenticateToken, async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID de la solicitud
+ *         description: ID de la solicitud de servicio
  *     responses:
  *       200:
- *         description: Detalles de la solicitud
+ *         description: Solicitud eliminada exitosamente
  *       404:
  *         description: Solicitud no encontrada
  */
-router.get('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res) => {
   try {
-    const serviceRequest = await ServiceRequest.findOne({
+    const serviceRequest = await ServiceRequest.findOneAndDelete({
       _id: req.params.id,
-      $or: [{ user_id: req.user.userId }, { nurse_id: req.user.userId }]
-    }).populate('patient_ids', 'name fecha_nacimiento genero descripcion');
+      user_id: req.userId,
+    });
 
     if (!serviceRequest) {
-      return res.status(404).json({ message: 'Solicitud no encontrada' });
+      return res.status(404).json({ message: 'Solicitud de servicio no encontrada' });
     }
 
-    res.status(200).json(serviceRequest);
+    res.status(200).json({ message: 'Solicitud eliminada exitosamente' });
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener los detalles de la solicitud', error: error.message });
+    res.status(500).json({ message: 'Error al eliminar la solicitud', error: error.message });
   }
 });
 
