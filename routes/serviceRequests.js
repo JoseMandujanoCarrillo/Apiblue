@@ -53,14 +53,17 @@ router.post('/', authenticateToken, async (req, res) => {
 
   try {
     // Verificar que los pacientes pertenecen al usuario autenticado
-    const validPatients = await Patient.find({ _id: { $in: patient_ids }, usuario_id: req.userId });
+    const validPatients = await Patient.find({
+      _id: { $in: patient_ids },
+      usuario_id: String(req.userId), // Asegurarse que sea un string
+    });
 
     if (validPatients.length !== patient_ids.length) {
       return res.status(403).json({ message: 'Acceso denegado a uno o más pacientes seleccionados' });
     }
 
     const newRequest = new ServiceRequest({
-      user_id: req.userId,
+      user_id: req.userId, // Asegúrate de que sea un string
       nurse_id,
       patient_ids,
       detalles,
