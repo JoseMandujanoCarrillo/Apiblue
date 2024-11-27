@@ -28,8 +28,14 @@ const router = express.Router();
  *             type: object
  *             properties:
  *               user_id:
- *                 type: string
- *                 description: "ID del usuario que solicita el servicio"
+ *                 type: object
+ *                 properties:
+ *                   userId:
+ *                     type: string
+ *                     description: "ID del usuario"
+ *                   role:
+ *                     type: string
+ *                     description: "Rol del usuario"
  *               nurse_id:
  *                 type: string
  *                 description: "ID del enfermero asignado"
@@ -58,16 +64,16 @@ router.post('/', authenticateToken, async (req, res) => {
     // Verificar que los pacientes pertenecen al usuario autenticado
     const validPatients = await Patient.find({
       _id: { $in: patient_ids },
-      usuario_id: req.userId,  // Aquí se utiliza el ID del usuario autenticado
+      usuario_id: req.userId, // Aquí se utiliza el ID del usuario autenticado
     });
 
     if (validPatients.length !== patient_ids.length) {
       return res.status(403).json({ message: 'Acceso denegado a uno o más pacientes seleccionados' });
     }
 
-    // Crear la nueva solicitud
+    // Crear la nueva solicitud con user_id como objeto
     const newRequest = new ServiceRequest({
-      user_id: req.userId,  // Usamos el userId desde el token de autenticación
+      user_id: { userId: req.userId, role: req.userRole }, // Usamos el userId y rol desde el token
       nurse_id,
       patient_ids,
       detalles,
@@ -135,7 +141,10 @@ router.get('/', authenticateToken, async (req, res) => {
 
   try {
     const filter = {
-      $or: [{ user_id: req.userId }, { nurse_id: req.userId }],
+      $or: [
+        { 'user_id.userId': req.userId }, // Filtrar por `user_id.userId`
+        { nurse_id: req.userId },
+      ],
     };
 
     if (estado) {
@@ -206,7 +215,10 @@ router.put('/:id', authenticateToken, async (req, res) => {
     const serviceRequest = await ServiceRequest.findOneAndUpdate(
       {
         _id: req.params.id,
-        $or: [{ user_id: req.userId }, { nurse_id: req.userId }],
+        $or: [
+          { 'user_id.userId': req.userId }, // Verificar userId dentro de user_id
+          { nurse_id: req.userId },
+        ],
       },
       { estado },
       { new: true }
@@ -247,7 +259,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const serviceRequest = await ServiceRequest.findOneAndDelete({
       _id: req.params.id,
-      user_id: req.userId,
+      'user_id.userId': req.userId, // Verificar userId dentro de user_id
     });
 
     if (!serviceRequest) {

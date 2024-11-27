@@ -1,21 +1,21 @@
 const mongoose = require('mongoose');
 
 const ServiceRequestSchema = new mongoose.Schema({
-  user_id: { type: String, required: true },  // ID del usuario que solicita el servicio
-  nurse_id: { type: String, required: true }, // ID del enfermero asignado
-  patient_ids: [{ type: String, required: true }], // IDs de los pacientes asociados
+  user_id: {
+    type: mongoose.Schema.Types.Mixed, // Permite almacenar cualquier tipo, incluyendo objetos
+    required: true,
+  },
+  nurse_id: { type: String, required: true },
+  patient_ids: [{ type: String, required: true }],
   estado: { type: String, default: 'pendiente' },
-  detalles: { type: String }, // Detalles adicionales sobre el servicio
+  detalles: { type: String },
   fecha: { type: Date, required: true },
   tarifa: { type: Number, required: true },
   pago_realizado: { type: Boolean, default: false },
-  estado: { type: String, default: 'pendiente' },
-  pago_realizado: { type: Boolean, default: false }, // Estado de pago realizado
-  pago_liberado: { type: Boolean, default: false }  ,
-  documentacion_servicio: { type: String }, // Documentación o notas sobre el servicio realizado
-  observaciones: { type: String }, // Observaciones sobre la atención prestada
-  recomendaciones: { type: String } // Recomendaciones para el usuario
-
+  pago_liberado: { type: Boolean, default: false },
+  documentacion_servicio: { type: String },
+  observaciones: { type: String },
+  recomendaciones: { type: String },
 });
 
 module.exports = mongoose.model('ServiceRequest', ServiceRequestSchema);
