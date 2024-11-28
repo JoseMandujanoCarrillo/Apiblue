@@ -63,15 +63,12 @@ const router = express.Router();
  *       403:
  *         description: No autorizado
  */
-
-// Ruta para crear una nueva solicitud de servicio
 router.post('/', authenticateToken, async (req, res) => {
   const { nurse_id, patient_ids, detalles, fecha, tarifa } = req.body;
-  const { userId } = req.user_id;
 
   try {
     const serviceRequest = new ServiceRequest({
-      user_id: userId, // userId ya es un ObjectId
+      user_id: new mongoose.Types.ObjectId(req.user_id.userId), // Convertir userId aquí
       nurse_id: nurse_id ? new mongoose.Types.ObjectId(nurse_id) : null,
       patient_ids: patient_ids?.map(id => new mongoose.Types.ObjectId(id)) || [],
       detalles,
@@ -86,7 +83,6 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 });
 
-
 /**
  * @swagger
  * /service-requests:
@@ -95,24 +91,60 @@ router.post('/', authenticateToken, async (req, res) => {
  *     tags: [ServiceRequests]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: estado
+ *         schema:
+ *           type: string
+ *           enum: [pendiente, aceptada, completada]
+ *         description: Filtrar solicitudes por estado
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Página actual
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Número de solicitudes por página
  *     responses:
  *       200:
  *         description: Lista de solicitudes creadas por el usuario autenticado
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/ServiceRequest'
- *       403:
- *         description: No autorizado
  */
 router.get('/', authenticateToken, async (req, res) => {
+  const { estado, page = 1, limit = 10 } = req.query;
+
   try {
-    const serviceRequests = await ServiceRequest.find({
-      user_id: new mongoose.Types.ObjectId(req.user_id.userId),
+    const filter = {
+      $or: [
+        { user_id: new mongoose.Types.ObjectId(req.user_id.userId) }, // Convertir userId aquí
+        { nurse_id: new mongoose.Types.ObjectId(req.user_id.userId) },
+      ],
+    };
+
+    if (estado) {
+      filter.estado = estado;
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [total, requests] = await Promise.all([
+      ServiceRequest.countDocuments(filter),
+      ServiceRequest.find(filter)
+        .skip(skip)
+        .limit(Number(limit))
+        .populate('patient_ids', 'name fecha_nacimiento genero descripcion'),
+    ]);
+
+    res.status(200).json({
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      requests,
     });
-    res.status(200).json(serviceRequests);
   } catch (error) {
     res.status(500).json({ message: 'Error al obtener ServiceRequests', error: error.message });
   }
@@ -120,32 +152,61 @@ router.get('/', authenticateToken, async (req, res) => {
 
 /**
  * @swagger
- * /service-requests/nurse:
- *   get:
- *     summary: Obtener solicitudes asignadas al enfermero autenticado
+ * /service-requests/{id}:
+ *   put:
+ *     summary: Actualizar el estado de una solicitud
  *     tags: [ServiceRequests]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Lista de solicitudes asignadas al enfermero autenticado
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/ServiceRequest'
- *       403:
- *         description: No autorizado
  */
-router.get('/nurse', authenticateToken, async (req, res) => {
+router.put('/:id', authenticateToken, async (req, res) => {
+  const { estado } = req.body;
+
+  if (!['pendiente', 'aceptada', 'rechazada', 'completada'].includes(estado)) {
+    return res.status(400).json({ message: 'Estado inválido' });
+  }
+
   try {
-    const serviceRequests = await ServiceRequest.find({
-      nurse_id: new mongoose.Types.ObjectId(req.user_id.userId),
-    });
-    res.status(200).json(serviceRequests);
+    const serviceRequest = await ServiceRequest.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        $or: [
+          { user_id: new mongoose.Types.ObjectId(req.user_id.userId) },
+          { nurse_id: new mongoose.Types.ObjectId(req.user_id.userId) },
+        ],
+      },
+      { estado },
+      { new: true }
+    );
+
+    if (!serviceRequest) {
+      return res.status(404).json({ message: 'Solicitud no encontrada' });
+    }
+
+    res.status(200).json({ message: `Solicitud ${estado} exitosamente`, serviceRequest });
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener ServiceRequests', error: error.message });
+    res.status(400).json({ message: 'Error al actualizar la solicitud', error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /service-requests/{id}:
+ *   delete:
+ *     summary: Eliminar una solicitud de servicio
+ */
+router.delete('/:id', authenticateToken, async (req, res) => {
+  try {
+    const serviceRequest = await ServiceRequest.findOneAndDelete({
+      _id: req.params.id,
+      user_id: new mongoose.Types.ObjectId(req.user_id.userId), // Convertir userId aquí
+    });
+
+    if (!serviceRequest) {
+      return res.status(404).json({ message: 'Solicitud no encontrada' });
+    }
+
+    res.status(200).json({ message: 'Solicitud eliminada exitosamente' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al eliminar ServiceRequest', error: error.message });
   }
 });
 
