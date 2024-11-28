@@ -62,29 +62,41 @@ const router = express.Router();
  *       403:
  *         description: No autorizado
  */
+const mongoose = require('mongoose');
+
+// Ruta para crear una nueva solicitud de servicio
 router.post('/', authenticateToken, async (req, res) => {
   const { nurse_id, patient_ids, detalles, fecha, tarifa } = req.body;
 
-  if (!nurse_id || !patient_ids || !fecha || !tarifa) {
-    return res.status(400).json({ message: 'Faltan datos requeridos' });
+  // Obtener solo el userId del objeto req.user_id
+  const { userId } = req.user_id;
+
+  if (!userId) {
+    return res.status(400).json({ message: 'El campo user_id es obligatorio' });
   }
 
   try {
+    // Convertir el userId a ObjectId
+    const userObjectId = mongoose.Types.ObjectId(userId);
+
+    // Crear la solicitud de servicio
     const serviceRequest = new ServiceRequest({
-      user_id: req.user_id.userId, // Extraemos solo el userId
+      user_id: userObjectId, // Ahora solo estamos pasando el ObjectId
       nurse_id,
       patient_ids,
       detalles,
       fecha,
-      tarifa
+      tarifa,
     });
 
-    const savedRequest = await serviceRequest.save();
-    res.status(201).json(savedRequest);
+    // Guardar la solicitud de servicio
+    await serviceRequest.save();
+    res.status(201).json(serviceRequest);
   } catch (error) {
     res.status(400).json({ message: 'Error al crear ServiceRequest', error: error.message });
   }
 });
+
 
 
 /**
