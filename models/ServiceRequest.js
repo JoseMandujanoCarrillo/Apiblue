@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const ServiceRequestSchema = new mongoose.Schema({
   user_id: {
-    type: mongoose.Schema.Types.Mixed, // Permite almacenar cualquier tipo, incluyendo objetos
+    type: mongoose.Schema.Types.Mixed, // Permite almacenar objetos
     required: true,
   },
   nurse_id: { type: String, required: true },
