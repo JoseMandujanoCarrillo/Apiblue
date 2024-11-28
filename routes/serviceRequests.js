@@ -55,7 +55,7 @@ router.post('/', authenticateToken, async (req, res) => {
     // Verificar que los pacientes pertenecen al usuario autenticado
     const validPatients = await Patient.find({
       _id: { $in: patient_ids },
-      usuario_id: req.userId.userId, // Asegurarse de usar `userId` desde el token
+      usuario_id: req.userId.userId, // Usar el campo userId del token
     });
 
     if (validPatients.length !== patient_ids.length) {
@@ -63,8 +63,8 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     const newRequest = new ServiceRequest({
-      user_id: req.userId, // Pasamos el objeto completo `userId` y `role`
-      nurse_id,
+      user_id: req.userId, // Pasamos el objeto completo user_id
+      nurse_id, // ID del enfermero
       patient_ids,
       detalles,
       fecha,
@@ -115,8 +115,8 @@ router.get('/', authenticateToken, async (req, res) => {
   try {
     const filter = {
       $or: [
-        { 'user_id.userId': req.userId.userId }, // Usamos el campo `userId` del objeto
-        { nurse_id: req.userId.userId },
+        { 'user_id.userId': req.userId.userId }, // Filtrar por usuario creador
+        { nurse_id: req.userId.userId }, // Filtrar por enfermero asignado
       ],
     };
 
@@ -164,8 +164,8 @@ router.put('/:id', authenticateToken, async (req, res) => {
       {
         _id: req.params.id,
         $or: [
-          { 'user_id.userId': req.userId.userId },
-          { nurse_id: req.userId.userId },
+          { 'user_id.userId': req.userId.userId }, // Validación por usuario creador
+          { nurse_id: req.userId.userId }, // Validación por enfermero asignado
         ],
       },
       { estado },
@@ -192,7 +192,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const serviceRequest = await ServiceRequest.findOneAndDelete({
       _id: req.params.id,
-      'user_id.userId': req.userId.userId, // Filtrar usando `userId` del token
+      'user_id.userId': req.userId.userId, // Validación por usuario creador
     });
 
     if (!serviceRequest) {
