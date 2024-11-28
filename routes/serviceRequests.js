@@ -24,6 +24,11 @@ const { authenticateToken } = require('../middleware/auth');
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - nurse_id
+ *               - patient_ids
+ *               - fecha
+ *               - tarifa
  *             properties:
  *               nurse_id:
  *                 type: string
@@ -52,7 +57,7 @@ const { authenticateToken } = require('../middleware/auth');
  *       201:
  *         description: Solicitud de servicio creada exitosamente
  *       400:
- *         description: Error al crear la solicitud
+ *         description: Error en los datos enviados
  *       403:
  *         description: No autorizado
  */
@@ -72,10 +77,10 @@ router.post('/', authenticateToken, async (req, res) => {
             fecha,
             tarifa,
         });
-        await serviceRequest.save();
-        res.status(201).json(serviceRequest);
+        const savedRequest = await serviceRequest.save();
+        res.status(201).json(savedRequest);
     } catch (error) {
-        res.status(400).json({ message: 'Error al crear ServiceRequest', error });
+        res.status(400).json({ message: 'Error al crear ServiceRequest', error: error.message });
     }
 });
 
@@ -108,7 +113,7 @@ router.get('/', authenticateToken, async (req, res) => {
         const serviceRequests = await ServiceRequest.find({ user_id: req.user_id.userId });
         res.status(200).json(serviceRequests);
     } catch (error) {
-        res.status(500).json({ message: 'Error al obtener ServiceRequests', error });
+        res.status(500).json({ message: 'Error al obtener ServiceRequests', error: error.message });
     }
 });
 
@@ -141,7 +146,7 @@ router.get('/nurse', authenticateToken, async (req, res) => {
         const serviceRequests = await ServiceRequest.find({ nurse_id: req.user_id.userId });
         res.status(200).json(serviceRequests);
     } catch (error) {
-        res.status(500).json({ message: 'Error al obtener ServiceRequests', error });
+        res.status(500).json({ message: 'Error al obtener ServiceRequests', error: error.message });
     }
 });
 
