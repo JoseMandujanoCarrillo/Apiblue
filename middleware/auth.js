@@ -12,7 +12,7 @@ function authenticateToken(req, res, next) {
 
     jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
         if (err) return res.status(403).json({ message: 'Token no válido' });
-        req.user_id = { userId: user.userId, role: user.role }; // Agregar el objeto con `userId` y `role`
+        req.user_id = { userId: user.userId, role: user.role }; // Asignamos un objeto con userId y role
         next();
     });
 }

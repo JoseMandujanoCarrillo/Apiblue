@@ -1,22 +1,20 @@
 const express = require('express');
-const ServiceRequest = require('../models/ServiceRequest');
-const Patient = require('../models/Patient');
-const { authenticateToken } = require('../middleware/auth');
-
 const router = express.Router();
+const ServiceRequest = require('../models/ServiceRequest');
+const { authenticateToken } = require('../middleware/auth');
 
 /**
  * @swagger
  * tags:
  *   name: ServiceRequests
- *   description: Endpoints para la gestión de solicitudes de servicio de enfermería
+ *   description: Gestión de solicitudes de servicio
  */
 
 /**
  * @swagger
  * /service-requests:
  *   post:
- *     summary: Crear una nueva solicitud de servicio
+ *     summary: Crear una solicitud de servicio
  *     tags: [ServiceRequests]
  *     security:
  *       - bearerAuth: []
@@ -30,179 +28,121 @@ const router = express.Router();
  *               nurse_id:
  *                 type: string
  *                 description: ID del enfermero asignado
+ *                 example: "64abc123efg456"
  *               patient_ids:
  *                 type: array
  *                 items:
  *                   type: string
- *                 description: IDs de los pacientes seleccionados
+ *                 description: Lista de IDs de pacientes
+ *                 example: ["64abc123efg456", "64def789hij101"]
  *               detalles:
  *                 type: string
+ *                 description: Detalles del servicio
+ *                 example: "Visita domiciliaria para control de presión arterial"
  *               fecha:
  *                 type: string
- *                 format: date
+ *                 format: date-time
+ *                 description: Fecha programada para el servicio
+ *                 example: "2024-12-01T10:00:00Z"
  *               tarifa:
  *                 type: number
+ *                 description: Tarifa del servicio
+ *                 example: 1500
  *     responses:
  *       201:
- *         description: Solicitud creada exitosamente
+ *         description: Solicitud de servicio creada exitosamente
  *       400:
  *         description: Error al crear la solicitud
+ *       403:
+ *         description: No autorizado
  */
 router.post('/', authenticateToken, async (req, res) => {
-  const { nurse_id, patient_ids, detalles, fecha, tarifa } = req.body;
+    const { nurse_id, patient_ids, detalles, fecha, tarifa } = req.body;
 
-  try {
-    // Verificar que los pacientes pertenecen al usuario autenticado
-    const validPatients = await Patient.find({
-      _id: { $in: patient_ids },
-      usuario_id: req.userId.userId, // Usar el campo userId del token
-    });
-
-    if (validPatients.length !== patient_ids.length) {
-      return res.status(403).json({ message: 'Acceso denegado a uno o más pacientes seleccionados' });
+    if (req.user_id.role !== 'usuario') {
+        return res.status(403).json({ message: 'No autorizado para crear ServiceRequest' });
     }
 
-    const newRequest = new ServiceRequest({
-      user_id: req.userId, // Pasamos el objeto completo user_id
-      nurse_id, // ID del enfermero
-      patient_ids,
-      detalles,
-      fecha,
-      tarifa,
-    });
-
-    await newRequest.save();
-    res.status(201).json(newRequest);
-  } catch (error) {
-    res.status(400).json({ message: 'Error al crear la solicitud de servicio', error: error.message });
-  }
+    try {
+        const serviceRequest = new ServiceRequest({
+            user_id: req.user_id.userId,
+            nurse_id,
+            patient_ids,
+            detalles,
+            fecha,
+            tarifa,
+        });
+        await serviceRequest.save();
+        res.status(201).json(serviceRequest);
+    } catch (error) {
+        res.status(400).json({ message: 'Error al crear ServiceRequest', error });
+    }
 });
 
 /**
  * @swagger
  * /service-requests:
  *   get:
- *     summary: Obtener todas las solicitudes del usuario o enfermero autenticado
+ *     summary: Obtener solicitudes creadas por el usuario
  *     tags: [ServiceRequests]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: estado
- *         schema:
- *           type: string
- *           enum: [pendiente, aceptada, completada]
- *         description: Filtrar solicitudes por estado
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Número de la página (por defecto 1)
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Número de elementos por página (por defecto 10)
  *     responses:
  *       200:
- *         description: Lista de solicitudes de servicio
+ *         description: Lista de solicitudes creadas por el usuario autenticado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/ServiceRequest'
+ *       403:
+ *         description: No autorizado
  */
 router.get('/', authenticateToken, async (req, res) => {
-  const { estado, page = 1, limit = 10 } = req.query;
-
-  try {
-    const filter = {
-      $or: [
-        { 'user_id.userId': req.userId.userId }, // Filtrar por usuario creador
-        { nurse_id: req.userId.userId }, // Filtrar por enfermero asignado
-      ],
-    };
-
-    if (estado) {
-      filter.estado = estado;
+    if (req.user_id.role !== 'usuario') {
+        return res.status(403).json({ message: 'No autorizado para ver estas solicitudes' });
     }
 
-    const skip = (page - 1) * limit;
-
-    const [total, requests] = await Promise.all([
-      ServiceRequest.countDocuments(filter),
-      ServiceRequest.find(filter)
-        .skip(skip)
-        .limit(Number(limit))
-        .populate('patient_ids', 'name fecha_nacimiento genero descripcion'),
-    ]);
-
-    res.status(200).json({
-      total,
-      page: Number(page),
-      limit: Number(limit),
-      requests,
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Error al obtener las solicitudes', error: error.message });
-  }
+    try {
+        const serviceRequests = await ServiceRequest.find({ user_id: req.user_id.userId });
+        res.status(200).json(serviceRequests);
+    } catch (error) {
+        res.status(500).json({ message: 'Error al obtener ServiceRequests', error });
+    }
 });
 
 /**
  * @swagger
- * /service-requests/{id}:
- *   put:
- *     summary: Actualizar el estado de una solicitud
+ * /service-requests/nurse:
+ *   get:
+ *     summary: Obtener solicitudes asignadas al enfermero autenticado
  *     tags: [ServiceRequests]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lista de solicitudes asignadas al enfermero autenticado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/ServiceRequest'
+ *       403:
+ *         description: No autorizado
  */
-router.put('/:id', authenticateToken, async (req, res) => {
-  const { estado } = req.body;
-
-  if (!['pendiente', 'aceptada', 'rechazada', 'completada'].includes(estado)) {
-    return res.status(400).json({ message: 'Estado inválido' });
-  }
-
-  try {
-    const serviceRequest = await ServiceRequest.findOneAndUpdate(
-      {
-        _id: req.params.id,
-        $or: [
-          { 'user_id.userId': req.userId.userId }, // Validación por usuario creador
-          { nurse_id: req.userId.userId }, // Validación por enfermero asignado
-        ],
-      },
-      { estado },
-      { new: true }
-    );
-
-    if (!serviceRequest) {
-      return res.status(404).json({ message: 'Solicitud no encontrada' });
+router.get('/nurse', authenticateToken, async (req, res) => {
+    if (req.user_id.role !== 'enfermero') {
+        return res.status(403).json({ message: 'No autorizado para ver estas solicitudes' });
     }
 
-    res.status(200).json({ message: `Solicitud ${estado} exitosamente`, serviceRequest });
-  } catch (error) {
-    res.status(400).json({ message: 'Error al actualizar la solicitud', error: error.message });
-  }
-});
-
-/**
- * @swagger
- * /service-requests/{id}:
- *   delete:
- *     summary: Eliminar una solicitud de servicio
- */
-router.delete('/:id', authenticateToken, async (req, res) => {
-  try {
-    const serviceRequest = await ServiceRequest.findOneAndDelete({
-      _id: req.params.id,
-      'user_id.userId': req.userId.userId, // Validación por usuario creador
-    });
-
-    if (!serviceRequest) {
-      return res.status(404).json({ message: 'Solicitud no encontrada' });
+    try {
+        const serviceRequests = await ServiceRequest.find({ nurse_id: req.user_id.userId });
+        res.status(200).json(serviceRequests);
+    } catch (error) {
+        res.status(500).json({ message: 'Error al obtener ServiceRequests', error });
     }
-
-    res.status(200).json({ message: 'Solicitud eliminada exitosamente' });
-  } catch (error) {
-    res.status(500).json({ message: 'Error al eliminar la solicitud', error: error.message });
-  }
 });
 
 module.exports = router;
