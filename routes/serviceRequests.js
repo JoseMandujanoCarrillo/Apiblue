@@ -1,7 +1,8 @@
 const express = require('express');
-const router = express.Router();
 const ServiceRequest = require('../models/ServiceRequest');
 const { authenticateToken } = require('../middleware/auth');
+
+const router = express.Router();
 
 /**
  * @swagger
@@ -62,26 +63,32 @@ const { authenticateToken } = require('../middleware/auth');
  *         description: No autorizado
  */
 router.post('/', authenticateToken, async (req, res) => {
-    const { nurse_id, patient_ids, detalles, fecha, tarifa } = req.body;
+  const { nurse_id, patient_ids, detalles, fecha, tarifa } = req.body;
 
-    if (req.user_id.role !== 'usuario') {
-        return res.status(403).json({ message: 'No autorizado para crear ServiceRequest' });
-    }
+  if (!nurse_id || !patient_ids || !fecha || !tarifa) {
+    return res.status(400).json({ message: 'Faltan datos requeridos' });
+  }
 
-    try {
-        const serviceRequest = new ServiceRequest({
-            user_id: req.user_id.userId,  // Asegúrate de que el user_id se asigne correctamente
-            nurse_id,
-            patient_ids,
-            detalles,
-            fecha,
-            tarifa,
-        });
-        const savedRequest = await serviceRequest.save();
-        res.status(201).json(savedRequest);
-    } catch (error) {
-        res.status(400).json({ message: 'Error al crear ServiceRequest', error: error.message });
-    }
+  // Aseguramos que solo los usuarios con rol 'usuario' puedan crear solicitudes
+  if (req.user_id.role !== 'usuario') {
+    return res.status(403).json({ message: 'No autorizado para crear ServiceRequest' });
+  }
+
+  try {
+    const serviceRequest = new ServiceRequest({
+      user_id: req.user_id.userId, // usas req.user_id.userId como el ID del usuario que hace la solicitud
+      nurse_id,
+      patient_ids,
+      detalles,
+      fecha,
+      tarifa
+    });
+
+    const savedRequest = await serviceRequest.save();
+    res.status(201).json(savedRequest);
+  } catch (error) {
+    res.status(400).json({ message: 'Error al crear ServiceRequest', error: error.message });
+  }
 });
 
 /**
@@ -105,16 +112,17 @@ router.post('/', authenticateToken, async (req, res) => {
  *         description: No autorizado
  */
 router.get('/', authenticateToken, async (req, res) => {
-    if (req.user_id.role !== 'usuario') {
-        return res.status(403).json({ message: 'No autorizado para ver estas solicitudes' });
-    }
+  // Verificamos que el usuario tenga rol 'usuario'
+  if (req.user_id.role !== 'usuario') {
+    return res.status(403).json({ message: 'No autorizado para ver estas solicitudes' });
+  }
 
-    try {
-        const serviceRequests = await ServiceRequest.find({ user_id: req.user_id.userId });
-        res.status(200).json(serviceRequests);
-    } catch (error) {
-        res.status(500).json({ message: 'Error al obtener ServiceRequests', error: error.message });
-    }
+  try {
+    const serviceRequests = await ServiceRequest.find({ user_id: req.user_id.userId });
+    res.status(200).json(serviceRequests);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener ServiceRequests', error: error.message });
+  }
 });
 
 /**
@@ -138,16 +146,17 @@ router.get('/', authenticateToken, async (req, res) => {
  *         description: No autorizado
  */
 router.get('/nurse', authenticateToken, async (req, res) => {
-    if (req.user_id.role !== 'enfermero') {
-        return res.status(403).json({ message: 'No autorizado para ver estas solicitudes' });
-    }
+  // Verificamos que el usuario tenga rol 'enfermero'
+  if (req.user_id.role !== 'enfermero') {
+    return res.status(403).json({ message: 'No autorizado para ver estas solicitudes' });
+  }
 
-    try {
-        const serviceRequests = await ServiceRequest.find({ nurse_id: req.user_id.userId });
-        res.status(200).json(serviceRequests);
-    } catch (error) {
-        res.status(500).json({ message: 'Error al obtener ServiceRequests', error: error.message });
-    }
+  try {
+    const serviceRequests = await ServiceRequest.find({ nurse_id: req.user_id.userId });
+    res.status(200).json(serviceRequests);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener ServiceRequests', error: error.message });
+  }
 });
 
 module.exports = router;
