@@ -69,32 +69,11 @@ router.post('/', authenticateToken, async (req, res) => {
   const { nurse_id, patient_ids, detalles, fecha, tarifa } = req.body;
   const { userId } = req.user_id;
 
-  if (!userId) {
-    return res.status(400).json({ message: 'El campo user_id es obligatorio' });
-  }
-
   try {
-    // Validar IDs
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ message: 'El user_id no es un ObjectId válido' });
-    }
-
-    const userObjectId = new mongoose.Types.ObjectId(userId);
-    const nurseObjectId = nurse_id ? new mongoose.Types.ObjectId(nurse_id) : null;
-    const patientObjectIds = Array.isArray(patient_ids)
-      ? patient_ids.map(id => {
-          if (!mongoose.Types.ObjectId.isValid(id)) {
-            throw new Error(`El ID de paciente "${id}" no es un ObjectId válido`);
-          }
-          return new mongoose.Types.ObjectId(id);
-        })
-      : [];
-
-    // Crear la solicitud de servicio
     const serviceRequest = new ServiceRequest({
-      user_id: userObjectId,
-      nurse_id: nurseObjectId,
-      patient_ids: patientObjectIds,
+      user_id: userId, // userId ya es un ObjectId
+      nurse_id: nurse_id ? new mongoose.Types.ObjectId(nurse_id) : null,
+      patient_ids: patient_ids?.map(id => new mongoose.Types.ObjectId(id)) || [],
       detalles,
       fecha,
       tarifa,
@@ -106,6 +85,7 @@ router.post('/', authenticateToken, async (req, res) => {
     res.status(400).json({ message: 'Error al crear ServiceRequest', error: error.message });
   }
 });
+
 
 /**
  * @swagger
