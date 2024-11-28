@@ -64,22 +64,19 @@ const { authenticateToken } = require('../middleware/auth');
 router.post('/', authenticateToken, async (req, res) => {
     const { nurse_id, patient_ids, detalles, fecha, tarifa } = req.body;
 
-    try {
-        // Validar rol del usuario
-        if (!req.user_id || req.user_id.role !== 'usuario') {
-            return res.status(403).json({ message: 'No autorizado para crear ServiceRequest' });
-        }
+    if (req.user_id.role !== 'usuario') {
+        return res.status(403).json({ message: 'No autorizado para crear ServiceRequest' });
+    }
 
-        // Crear nueva solicitud de servicio
+    try {
         const serviceRequest = new ServiceRequest({
-            user_id: req.user_id.userId,
+            user_id: req.user_id.userId,  // Asegúrate de que el user_id se asigne correctamente
             nurse_id,
             patient_ids,
             detalles,
             fecha,
             tarifa,
         });
-
         const savedRequest = await serviceRequest.save();
         res.status(201).json(savedRequest);
     } catch (error) {
@@ -108,12 +105,11 @@ router.post('/', authenticateToken, async (req, res) => {
  *         description: No autorizado
  */
 router.get('/', authenticateToken, async (req, res) => {
-    try {
-        // Validar rol del usuario
-        if (!req.user_id || req.user_id.role !== 'usuario') {
-            return res.status(403).json({ message: 'No autorizado para ver estas solicitudes' });
-        }
+    if (req.user_id.role !== 'usuario') {
+        return res.status(403).json({ message: 'No autorizado para ver estas solicitudes' });
+    }
 
+    try {
         const serviceRequests = await ServiceRequest.find({ user_id: req.user_id.userId });
         res.status(200).json(serviceRequests);
     } catch (error) {
@@ -142,12 +138,11 @@ router.get('/', authenticateToken, async (req, res) => {
  *         description: No autorizado
  */
 router.get('/nurse', authenticateToken, async (req, res) => {
-    try {
-        // Validar rol del enfermero
-        if (!req.user_id || req.user_id.role !== 'enfermero') {
-            return res.status(403).json({ message: 'No autorizado para ver estas solicitudes' });
-        }
+    if (req.user_id.role !== 'enfermero') {
+        return res.status(403).json({ message: 'No autorizado para ver estas solicitudes' });
+    }
 
+    try {
         const serviceRequests = await ServiceRequest.find({ nurse_id: req.user_id.userId });
         res.status(200).json(serviceRequests);
     } catch (error) {
