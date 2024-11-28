@@ -69,14 +69,9 @@ router.post('/', authenticateToken, async (req, res) => {
     return res.status(400).json({ message: 'Faltan datos requeridos' });
   }
 
-  // Aseguramos que solo los usuarios con rol 'usuario' puedan crear solicitudes
-  // if (req.user_id.role !== 'usuario') {
-  //   return res.status(403).json({ message: 'No autorizado para crear ServiceRequest' });
-  // }
-
   try {
     const serviceRequest = new ServiceRequest({
-      user_id: req.user_id.userId, // usas req.user_id.userId como el ID del usuario que hace la solicitud
+      user_id: req.user_id.userId, // Extraemos solo el userId
       nurse_id,
       patient_ids,
       detalles,
@@ -90,6 +85,7 @@ router.post('/', authenticateToken, async (req, res) => {
     res.status(400).json({ message: 'Error al crear ServiceRequest', error: error.message });
   }
 });
+
 
 /**
  * @swagger
