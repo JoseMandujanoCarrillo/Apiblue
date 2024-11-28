@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const ServiceRequest = require('../models/ServiceRequest');
 const { authenticateToken } = require('../middleware/auth');
 
@@ -62,13 +63,10 @@ const router = express.Router();
  *       403:
  *         description: No autorizado
  */
-const mongoose = require('mongoose');
 
 // Ruta para crear una nueva solicitud de servicio
 router.post('/', authenticateToken, async (req, res) => {
   const { nurse_id, patient_ids, detalles, fecha, tarifa } = req.body;
-
-  // Obtener solo el userId del objeto req.user_id
   const { userId } = req.user_id;
 
   if (!userId) {
@@ -76,28 +74,23 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 
   try {
-    // Convertir el userId a ObjectId
-    const userObjectId = mongoose.Types.ObjectId(userId);
+    const userObjectId = new mongoose.Types.ObjectId(userId);
 
-    // Crear la solicitud de servicio
     const serviceRequest = new ServiceRequest({
-      user_id: userObjectId, // Ahora solo estamos pasando el ObjectId
-      nurse_id,
-      patient_ids,
+      user_id: userObjectId,
+      nurse_id: nurse_id ? new mongoose.Types.ObjectId(nurse_id) : null,
+      patient_ids: patient_ids?.map(id => new mongoose.Types.ObjectId(id)) || [],
       detalles,
       fecha,
       tarifa,
     });
 
-    // Guardar la solicitud de servicio
-    await serviceRequest.save();
-    res.status(201).json(serviceRequest);
+    const savedRequest = await serviceRequest.save();
+    res.status(201).json(savedRequest);
   } catch (error) {
     res.status(400).json({ message: 'Error al crear ServiceRequest', error: error.message });
   }
 });
-
-
 
 /**
  * @swagger
@@ -120,13 +113,10 @@ router.post('/', authenticateToken, async (req, res) => {
  *         description: No autorizado
  */
 router.get('/', authenticateToken, async (req, res) => {
-  // Verificamos que el usuario tenga rol 'usuario'
-  // if (req.user_id.role !== 'usuario') {
-  //   return res.status(403).json({ message: 'No autorizado para ver estas solicitudes' });
-  // }
-
   try {
-    const serviceRequests = await ServiceRequest.find({ user_id: req.user_id.userId });
+    const serviceRequests = await ServiceRequest.find({
+      user_id: new mongoose.Types.ObjectId(req.user_id.userId),
+    });
     res.status(200).json(serviceRequests);
   } catch (error) {
     res.status(500).json({ message: 'Error al obtener ServiceRequests', error: error.message });
@@ -154,13 +144,10 @@ router.get('/', authenticateToken, async (req, res) => {
  *         description: No autorizado
  */
 router.get('/nurse', authenticateToken, async (req, res) => {
-  // Verificamos que el usuario tenga rol 'enfermero'
-  // if (req.user_id.role !== 'enfermero') {
-  //   return res.status(403).json({ message: 'No autorizado para ver estas solicitudes' });
-  // }
-
   try {
-    const serviceRequests = await ServiceRequest.find({ nurse_id: req.user_id.userId });
+    const serviceRequests = await ServiceRequest.find({
+      nurse_id: new mongoose.Types.ObjectId(req.user_id.userId),
+    });
     res.status(200).json(serviceRequests);
   } catch (error) {
     res.status(500).json({ message: 'Error al obtener ServiceRequests', error: error.message });
