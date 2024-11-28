@@ -74,12 +74,27 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 
   try {
-    const userObjectId = new mongoose.Types.ObjectId(userId);
+    // Validar IDs
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'El user_id no es un ObjectId válido' });
+    }
 
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+    const nurseObjectId = nurse_id ? new mongoose.Types.ObjectId(nurse_id) : null;
+    const patientObjectIds = Array.isArray(patient_ids)
+      ? patient_ids.map(id => {
+          if (!mongoose.Types.ObjectId.isValid(id)) {
+            throw new Error(`El ID de paciente "${id}" no es un ObjectId válido`);
+          }
+          return new mongoose.Types.ObjectId(id);
+        })
+      : [];
+
+    // Crear la solicitud de servicio
     const serviceRequest = new ServiceRequest({
       user_id: userObjectId,
-      nurse_id: nurse_id ? new mongoose.Types.ObjectId(nurse_id) : null,
-      patient_ids: patient_ids?.map(id => new mongoose.Types.ObjectId(id)) || [],
+      nurse_id: nurseObjectId,
+      patient_ids: patientObjectIds,
       detalles,
       fecha,
       tarifa,
