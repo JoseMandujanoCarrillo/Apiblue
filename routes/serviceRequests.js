@@ -1,7 +1,5 @@
 const express = require('express');
 const ServiceRequest = require('../models/ServiceRequest');
-const { authenticateToken } = require('../middleware/auth');
-
 const router = express.Router();
 
 /**
@@ -17,8 +15,6 @@ const router = express.Router();
  *   post:
  *     summary: Crear una solicitud de servicio
  *     tags: [ServiceRequests]
- *     security:
- *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -26,11 +22,16 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             required:
+ *               - user_id
  *               - nurse_id
  *               - patient_ids
  *               - fecha
  *               - tarifa
  *             properties:
+ *               user_id:
+ *                 type: string
+ *                 description: ID del usuario que está creando la solicitud
+ *                 example: "64abc123efg456"
  *               nurse_id:
  *                 type: string
  *                 description: ID del enfermero asignado
@@ -59,24 +60,19 @@ const router = express.Router();
  *         description: Solicitud de servicio creada exitosamente
  *       400:
  *         description: Error en los datos enviados
- *       403:
- *         description: No autorizado
  */
-router.post('/', authenticateToken, async (req, res) => {
-  const { nurse_id, patient_ids, detalles, fecha, tarifa } = req.body;
+router.post('/', async (req, res) => {
+  const { user_id, nurse_id, patient_ids, detalles, fecha, tarifa } = req.body;
 
-  if (!nurse_id || !patient_ids || !fecha || !tarifa) {
+  // Verificamos que los campos requeridos estén presentes
+  if (!user_id || !nurse_id || !patient_ids || !fecha || !tarifa) {
     return res.status(400).json({ message: 'Faltan datos requeridos' });
   }
 
-  // Aseguramos que solo los usuarios con rol 'usuario' puedan crear solicitudes
-  if (req.user_id.role !== 'usuario') {
-    return res.status(403).json({ message: 'No autorizado para crear ServiceRequest' });
-  }
-
   try {
+    // Crear la solicitud de servicio con el user_id proporcionado
     const serviceRequest = new ServiceRequest({
-      user_id: req.user_id.userId, // usas req.user_id.userId como el ID del usuario que hace la solicitud
+      user_id,
       nurse_id,
       patient_ids,
       detalles,
@@ -84,6 +80,7 @@ router.post('/', authenticateToken, async (req, res) => {
       tarifa
     });
 
+    // Guardar la solicitud en la base de datos
     const savedRequest = await serviceRequest.save();
     res.status(201).json(savedRequest);
   } catch (error) {
@@ -97,65 +94,79 @@ router.post('/', authenticateToken, async (req, res) => {
  *   get:
  *     summary: Obtener solicitudes creadas por el usuario
  *     tags: [ServiceRequests]
- *     security:
- *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Lista de solicitudes creadas por el usuario autenticado
+ *         description: Lista de solicitudes creadas por el usuario
  *         content:
  *           application/json:
  *             schema:
  *               type: array
  *               items:
  *                 $ref: '#/components/schemas/ServiceRequest'
- *       403:
- *         description: No autorizado
+ *       400:
+ *         description: Error en la solicitud
  */
-router.get('/', authenticateToken, async (req, res) => {
-  // Verificamos que el usuario tenga rol 'usuario'
-  if (req.user_id.role !== 'usuario') {
-    return res.status(403).json({ message: 'No autorizado para ver estas solicitudes' });
+router.get('/', async (req, res) => {
+  const { user_id } = req.query;
+
+  if (!user_id) {
+    return res.status(400).json({ message: 'El campo user_id es obligatorio' });
   }
 
   try {
-    const serviceRequests = await ServiceRequest.find({ user_id: req.user_id.userId });
+    // Buscar solicitudes de servicio creadas por el usuario
+    const serviceRequests = await ServiceRequest.find({ user_id });
     res.status(200).json(serviceRequests);
   } catch (error) {
     res.status(500).json({ message: 'Error al obtener ServiceRequests', error: error.message });
   }
 });
 
+
 /**
  * @swagger
  * /service-requests/nurse:
  *   get:
- *     summary: Obtener solicitudes asignadas al enfermero autenticado
+ *     summary: Obtener solicitudes asignadas al enfermero
  *     tags: [ServiceRequests]
- *     security:
- *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: nurse_id
+ *         schema:
+ *           type: string
+ *         description: ID del enfermero
+ *         example: "64abc123efg456"
  *     responses:
  *       200:
- *         description: Lista de solicitudes asignadas al enfermero autenticado
+ *         description: Lista de solicitudes asignadas al enfermero
  *         content:
  *           application/json:
  *             schema:
  *               type: array
  *               items:
  *                 $ref: '#/components/schemas/ServiceRequest'
- *       403:
- *         description: No autorizado
+ *       400:
+ *         description: Error en la solicitud
  */
-router.get('/nurse', authenticateToken, async (req, res) => {
-  // Verificamos que el usuario tenga rol 'enfermero'
-  if (req.user_id.role !== 'enfermero') {
-    return res.status(403).json({ message: 'No autorizado para ver estas solicitudes' });
+router.get('/nurse', async (req, res) => {
+  const { nurse_id } = req.query;
+
+  if (!nurse_id) {
+    return res.status(400).json({ message: 'El campo nurse_id es obligatorio' });
   }
 
   try {
-    const serviceRequests = await ServiceRequest.find({ nurse_id: req.user_id.userId });
+    // Buscar las solicitudes de servicio asignadas al enfermero
+    const serviceRequests = await ServiceRequest.find({ nurse_id });
+
+    // Si no se encuentran solicitudes, devolver un mensaje
+    if (serviceRequests.length === 0) {
+      return res.status(404).json({ message: 'No hay solicitudes asignadas a este enfermero' });
+    }
+
     res.status(200).json(serviceRequests);
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener ServiceRequests', error: error.message });
+    res.status(500).json({ message: 'Error al obtener las solicitudes del enfermero', error: error.message });
   }
 });
 
