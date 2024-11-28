@@ -27,9 +27,6 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             properties:
- *               user_id:
- *                 type: object
- *                 description: ID y rol del usuario
  *               nurse_id:
  *                 type: string
  *                 description: ID del enfermero asignado
@@ -53,13 +50,12 @@ const router = express.Router();
  */
 router.post('/', authenticateToken, async (req, res) => {
   const { nurse_id, patient_ids, detalles, fecha, tarifa } = req.body;
-  const { userId, role } = req.user_id;
 
   try {
-    // Verificar que los pacientes pertenecen al user_id proporcionado
+    // Verificar que los pacientes pertenecen al usuario autenticado
     const validPatients = await Patient.find({
       _id: { $in: patient_ids },
-      usuario_id: userId, // Usamos el userId extraído del objeto
+      usuario_id: req.userId.userId, // Asegurarse de usar `userId` desde el token
     });
 
     if (validPatients.length !== patient_ids.length) {
@@ -67,7 +63,7 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     const newRequest = new ServiceRequest({
-      user_id: { userId, role }, // Asignamos el user_id como objeto con userId y role
+      user_id: req.userId, // Pasamos el objeto completo `userId` y `role`
       nurse_id,
       patient_ids,
       detalles,
@@ -92,11 +88,6 @@ router.post('/', authenticateToken, async (req, res) => {
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: user_id
- *         schema:
- *           type: string
- *         description: ID del usuario (opcional)
- *       - in: query
  *         name: estado
  *         schema:
  *           type: string
@@ -119,12 +110,14 @@ router.post('/', authenticateToken, async (req, res) => {
  *         description: Lista de solicitudes de servicio
  */
 router.get('/', authenticateToken, async (req, res) => {
-  const { user_id, estado, page = 1, limit = 10 } = req.query;
-  const { userId } = req.user_id;
+  const { estado, page = 1, limit = 10 } = req.query;
 
   try {
     const filter = {
-      $or: [{ 'user_id.userId': userId }, { nurse_id: userId }],
+      $or: [
+        { 'user_id.userId': req.userId.userId }, // Usamos el campo `userId` del objeto
+        { nurse_id: req.userId.userId },
+      ],
     };
 
     if (estado) {
@@ -161,7 +154,6 @@ router.get('/', authenticateToken, async (req, res) => {
  */
 router.put('/:id', authenticateToken, async (req, res) => {
   const { estado } = req.body;
-  const { userId } = req.user_id;
 
   if (!['pendiente', 'aceptada', 'rechazada', 'completada'].includes(estado)) {
     return res.status(400).json({ message: 'Estado inválido' });
@@ -169,7 +161,13 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
   try {
     const serviceRequest = await ServiceRequest.findOneAndUpdate(
-      { _id: req.params.id, 'user_id.userId': userId },
+      {
+        _id: req.params.id,
+        $or: [
+          { 'user_id.userId': req.userId.userId },
+          { nurse_id: req.userId.userId },
+        ],
+      },
       { estado },
       { new: true }
     );
@@ -191,12 +189,10 @@ router.put('/:id', authenticateToken, async (req, res) => {
  *     summary: Eliminar una solicitud de servicio
  */
 router.delete('/:id', authenticateToken, async (req, res) => {
-  const { userId } = req.user_id;
-
   try {
     const serviceRequest = await ServiceRequest.findOneAndDelete({
       _id: req.params.id,
-      'user_id.userId': userId,
+      'user_id.userId': req.userId.userId, // Filtrar usando `userId` del token
     });
 
     if (!serviceRequest) {
