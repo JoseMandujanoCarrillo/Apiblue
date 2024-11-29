@@ -6,8 +6,16 @@ const ServiceRequestSchema = new mongoose.Schema({
     required: true, 
     ref: 'User' // Referencia al modelo 'User', si es necesario
   },
-  nurse_id: { type: String, required: true },
-  patient_ids: [{ type: String, required: true }],
+  nurse_id: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    required: true, 
+    ref: 'Nurse' // Referencia al modelo 'Nurse', si es necesario
+  },
+  patient_ids: [{ 
+    type: mongoose.Schema.Types.ObjectId, 
+    required: true, 
+    ref: 'Patient' // Referencia al modelo 'Patient', si es necesario
+  }],
   estado: { type: String, default: 'pendiente' },
   detalles: { type: String },
   fecha: { type: Date, required: true },
