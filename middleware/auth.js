@@ -3,11 +3,7 @@ const mongoose = require('mongoose');
 
 // Generar un token
 function generateToken(userId, role) {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('userId no es un ObjectId válido al generar el token');
-  }
-
-  return jwt.sign({ userId: String(userId), role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+  return jwt.sign({ userId, role }, process.env.JWT_SECRET, { expiresIn: '1h' });
 }
 
 // Middleware para autenticar el token
@@ -18,7 +14,7 @@ function authenticateToken(req, res, next) {
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) return res.status(403).json({ message: 'Token no válido' });
 
-    // Validar y convertir userId a ObjectId
+    // Validamos que el userId sea un ObjectId válido
     if (!mongoose.Types.ObjectId.isValid(user.userId)) {
       return res.status(400).json({ message: 'El userId en el token no es un ObjectId válido' });
     }

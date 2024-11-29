@@ -1,30 +1,34 @@
 const mongoose = require('mongoose');
 
 const ServiceRequestSchema = new mongoose.Schema({
-  user_id: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    required: true, 
-    ref: 'User' // Referencia al modelo 'User', si es necesario
+  paciente_id: {
+    type: mongoose.Types.ObjectId,
+    required: true,
+    ref: 'Patient'
   },
-  nurse_id: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    required: true, 
-    ref: 'Nurse' // Referencia al modelo 'Nurse', si es necesario
+  enfermero_id: {
+    type: mongoose.Types.ObjectId,
+    required: true,
+    ref: 'Nurse'
   },
-  patient_ids: [{ 
-    type: mongoose.Schema.Types.ObjectId, 
-    required: true, 
-    ref: 'Patient' // Referencia al modelo 'Patient', si es necesario
-  }],
-  estado: { type: String, default: 'pendiente' },
-  detalles: { type: String },
-  fecha: { type: Date, required: true },
-  tarifa: { type: Number, required: true },
-  pago_realizado: { type: Boolean, default: false },
-  pago_liberado: { type: Boolean, default: false },
-  documentacion_servicio: { type: String },
-  observaciones: { type: String },
-  recomendaciones: { type: String },
-});
+  usuario_id: {
+    type: mongoose.Types.ObjectId,
+    required: true,
+    ref: 'User'
+  },
+  estado: {
+    type: String,
+    required: true
+  },
+  descripcion: {
+    type: String
+  },
+  tarifa: {
+    type: String
+  },
+  duracion: {
+    type: Number
+  }
+}, { timestamps: true });
 
 module.exports = mongoose.model('ServiceRequest', ServiceRequestSchema);
