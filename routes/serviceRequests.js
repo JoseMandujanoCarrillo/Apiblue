@@ -150,8 +150,6 @@ router.get('/nurse/:nurse_id', authenticateToken, async (req, res) => {
     res.status(500).json({ message: 'Error al obtener las solicitudes de servicio' });
   }
 });
-
-// Ruta PUT para modificar el estado de una solicitud de servicio
 /**
  * @swagger
  * /service-requests/{id}/estado:
@@ -166,17 +164,17 @@ router.get('/nurse/:nurse_id', authenticateToken, async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *       - name: estado
- *         in: body
- *         description: Estado que se actualizará
- *         required: true
- *         schema:
- *           type: object
- *           properties:
- *             estado:
- *               type: string
- *               enum: ['pendiente', 'en_progreso', 'completado']
- *               description: El nuevo estado de la solicitud
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               estado:
+ *                 type: string
+ *                 enum: ['pendiente', 'en_progreso', 'completado']
+ *                 description: El nuevo estado de la solicitud
  *     responses:
  *       200:
  *         description: Estado de la solicitud actualizado correctamente
@@ -197,9 +195,10 @@ router.get('/nurse/:nurse_id', authenticateToken, async (req, res) => {
  *         description: Error al modificar el estado de la solicitud
  */
 router.put('/:id/estado', authenticateToken, async (req, res) => {
-  const { id } = req.params;
-  const { estado } = req.body;
+  const { id } = req.params; // Obtener el id de la solicitud de servicio de la ruta
+  const { estado } = req.body; // Obtener el nuevo estado del cuerpo de la solicitud
 
+  // Verificar si el estado es válido
   if (!estado || !['pendiente', 'en_progreso', 'completado'].includes(estado)) {
     return res.status(400).json({ message: 'Estado no válido' });
   }
@@ -213,14 +212,15 @@ router.put('/:id/estado', authenticateToken, async (req, res) => {
     }
 
     // Verificar que el enfermero que está haciendo la solicitud tenga el mismo nurse_id
-    if (serviceRequest.nurse_id !== req.user_id.userId) {
+    if (serviceRequest.nurse_id.toString() !== req.user_id.userId) {
       return res.status(403).json({ message: 'No tienes permiso para modificar esta solicitud' });
     }
 
-    // Actualizar el estado
+    // Actualizar el estado de la solicitud
     serviceRequest.estado = estado;
     await serviceRequest.save();
 
+    // Devolver la respuesta con el servicio actualizado
     res.json({ message: 'Estado actualizado correctamente', serviceRequest });
   } catch (err) {
     console.error(err);
