@@ -14,7 +14,7 @@ const ServiceRequestSchema = new mongoose.Schema({
   usuario_id: {
     type: mongoose.Types.ObjectId,
     required: true,
-    ref: 'User'
+    ref: 'User' // Usuario autenticado que creó la solicitud
   },
   estado: {
     type: String,

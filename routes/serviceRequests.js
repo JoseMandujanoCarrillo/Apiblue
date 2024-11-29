@@ -1,15 +1,15 @@
 const express = require('express');
-const Patient = require('../models/Patient'); // Modelo de Paciente
+const ServiceRequest = require('../models/ServiceRequest'); // Modelo de solicitud de servicio
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
 /**
  * @swagger
- * /patients:
+ * /service-requests:
  *   post:
- *     summary: Crear un nuevo paciente
- *     tags: [Patients]
+ *     summary: Crear una nueva solicitud de servicio
+ *     tags: [ServiceRequests]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -19,58 +19,63 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             properties:
- *               name:
+ *               paciente_id:
  *                 type: string
- *                 description: Nombre del paciente
- *               fecha_nacimiento:
+ *                 description: ID del paciente
+ *               enfermero_id:
  *                 type: string
- *                 format: date
- *                 description: Fecha de nacimiento del paciente
- *               genero:
+ *                 description: ID del enfermero
+ *               estado:
  *                 type: string
- *                 description: Género del paciente
- *               movilidad:
- *                 type: string
- *                 description: Movilidad del paciente
+ *                 description: Estado de la solicitud
  *               descripcion:
  *                 type: string
- *                 description: Descripción adicional del paciente
+ *                 description: Descripción de la solicitud
+ *               tarifa:
+ *                 type: string
+ *                 description: Tarifa del servicio
+ *               duracion:
+ *                 type: integer
+ *                 description: Duración del servicio en horas
  *     responses:
  *       201:
- *         description: Paciente creado exitosamente
+ *         description: Solicitud de servicio creada exitosamente
  *       400:
- *         description: Error al crear el paciente
+ *         description: Error al crear la solicitud
  *       401:
  *         description: Token no proporcionado o no válido
  */
 router.post('/', authenticateToken, async (req, res) => {
-  const { name, fecha_nacimiento, genero, movilidad, descripcion } = req.body;
-  const { userId } = req.user_id;
+  const { paciente_id, enfermero_id, estado, descripcion, tarifa, duracion } = req.body;
+  const { userId } = req.user_id; // Extraer `userId` del token
+
+  // Validar campos obligatorios
+  if (!paciente_id || !enfermero_id || !estado) {
+    return res.status(400).json({ message: 'paciente_id, enfermero_id y estado son obligatorios' });
+  }
 
   // Validar que el userId sea un ObjectId válido
   if (!userId) {
     return res.status(400).json({ message: 'El userId en el token no es válido' });
   }
 
-  if (!name || !fecha_nacimiento || !genero) {
-    return res.status(400).json({ message: 'Los campos name, fecha_nacimiento y genero son obligatorios' });
-  }
-
   try {
-    const newPatient = new Patient({
-      name,
-      fecha_nacimiento,
-      genero,
-      movilidad,
+    // Crear la nueva solicitud de servicio
+    const newServiceRequest = new ServiceRequest({
+      paciente_id,
+      enfermero_id,
+      usuario_id: userId, // Asociar al usuario autenticado
+      estado,
       descripcion,
-      usuario_id: userId // Asociar el paciente al usuario autenticado
+      tarifa,
+      duracion
     });
 
-    await newPatient.save();
+    await newServiceRequest.save();
 
-    res.status(201).json(newPatient);
+    res.status(201).json(newServiceRequest);
   } catch (error) {
-    res.status(400).json({ message: 'Error al crear el paciente', error: error.message });
+    res.status(400).json({ message: 'Error al crear la solicitud', error: error.message });
   }
 });
 
