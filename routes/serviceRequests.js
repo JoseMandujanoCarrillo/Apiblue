@@ -47,11 +47,16 @@ const router = express.Router();
  */
 router.post('/', authenticateToken, async (req, res) => {
   const { paciente_id, enfermero_id, estado, descripcion, tarifa, duracion } = req.body;
-  const { userId } = req.user_id; // Extraer `userId` del token
+  const { userId } = req.user_id; // Extraer `userId` del token, ya validado como ObjectId
 
   // Validar campos obligatorios
   if (!paciente_id || !enfermero_id || !estado) {
     return res.status(400).json({ message: 'paciente_id, enfermero_id y estado son obligatorios' });
+  }
+
+  // Validar que el userId esté presente y sea un ObjectId válido
+  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+    return res.status(400).json({ message: 'El userId en el token no es válido' });
   }
 
   try {
@@ -59,7 +64,7 @@ router.post('/', authenticateToken, async (req, res) => {
     const newServiceRequest = new ServiceRequest({
       paciente_id,
       enfermero_id,
-      usuario_id: userId, // Asociar al usuario autenticado
+      usuario_id: userId, // Asociar al usuario autenticado (con ObjectId válido)
       estado,
       descripcion,
       tarifa,
