@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 // Definir el esquema para la solicitud de servicio
 const serviceRequestSchema = new mongoose.Schema({
   user_id: {
-    type: String,
+    type: String, // Puede ser un string o un ObjectId
     required: true,
   },
   nurse_id: {
