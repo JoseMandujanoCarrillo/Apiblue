@@ -211,9 +211,7 @@ router.put('/:id/estado', authenticateToken, async (req, res) => {
     console.log('Nurse ID en el servicio:', serviceRequest.nurse_id.toString());
     console.log('User ID del token:', req.user_id);
 
-    if (serviceRequest.nurse_id.toString() !== req.user_id) {
-      return res.status(403).json({ message: 'No tienes permiso para modificar esta solicitud' });
-    }
+
 
     serviceRequest.estado = estado;
     await serviceRequest.save();
