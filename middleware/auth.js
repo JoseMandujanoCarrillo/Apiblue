@@ -1,5 +1,4 @@
 const jwt = require('jsonwebtoken');
-const mongoose = require('mongoose');
 
 // Generar un token
 function generateToken(userId, role) {
@@ -14,12 +13,8 @@ function authenticateToken(req, res, next) {
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) return res.status(403).json({ message: 'Token no válido' });
 
-    // Validamos que el userId sea un ObjectId válido
-    if (!mongoose.Types.ObjectId.isValid(user.userId)) {
-      return res.status(400).json({ message: 'El userId en el token no es un ObjectId válido' });
-    }
-
-    req.user_id = { userId: new mongoose.Types.ObjectId(user.userId), role: user.role };
+    // No convertimos a ObjectId en este punto, lo hacemos en las rutas según necesidad
+    req.user_id = { userId: user.userId, role: user.role };
     next();
   });
 }
