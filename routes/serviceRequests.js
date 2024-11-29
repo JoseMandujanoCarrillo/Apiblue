@@ -54,11 +54,6 @@ router.post('/', authenticateToken, async (req, res) => {
     return res.status(400).json({ message: 'paciente_id, enfermero_id y estado son obligatorios' });
   }
 
-  // Validar que el userId sea un ObjectId válido
-  if (!userId) {
-    return res.status(400).json({ message: 'El userId en el token no es válido' });
-  }
-
   try {
     // Crear la nueva solicitud de servicio
     const newServiceRequest = new ServiceRequest({
@@ -68,7 +63,7 @@ router.post('/', authenticateToken, async (req, res) => {
       estado,
       descripcion,
       tarifa,
-      duracion
+      duracion,
     });
 
     await newServiceRequest.save();
