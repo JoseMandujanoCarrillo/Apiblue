@@ -1,5 +1,5 @@
 const express = require('express');
-const Patient = require('../models/Patient');
+const ServiceRequest = require('../models/ServiceRequest'); // IMPORTAR el modelo
 const { authenticateToken } = require('../middleware/auth2');
 
 const router = express.Router();
@@ -85,7 +85,7 @@ router.post('/', authenticateToken, async (req, res) => {
 
   try {
     const newServiceRequest = new ServiceRequest({
-      usuario_id: user_id,
+      user_id,
       nurse_id,
       patient_ids,
       estado,
@@ -96,10 +96,10 @@ router.post('/', authenticateToken, async (req, res) => {
       pago_liberado,
     });
 
-    await newService.save();
+    await newServiceRequest.save(); // Corregido: Usar newServiceRequest
 
-    const { _id, ...ServiceData } = newService.toObject(); // Excluir `_id` de la respuesta
-    res.status(201).json(ServiceData);
+    const { _id, ...serviceData } = newServiceRequest.toObject(); // Excluir `_id` de la respuesta
+    res.status(201).json(serviceData);
   } catch (error) {
     res.status(400).json({ message: 'Error al crear el Servicio', error: error.message });
   }
