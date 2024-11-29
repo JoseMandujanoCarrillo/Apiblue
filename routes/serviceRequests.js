@@ -173,7 +173,6 @@ router.get('/nurse/:nurse_id', authenticateToken, async (req, res) => {
  *             properties:
  *               estado:
  *                 type: string
-
  *                 description: El nuevo estado de la solicitud
  *     responses:
  *       200:
@@ -247,7 +246,6 @@ router.put('/:id/estado', authenticateToken, async (req, res) => {
  *             type: string
  *         estado:
  *           type: string
- *           enum: ['pendiente', 'en_progreso', 'completado']
  *         detalles:
  *           type: string
  *         fecha:

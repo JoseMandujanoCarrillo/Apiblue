@@ -4,7 +4,7 @@ const serviceRequestSchema = new mongoose.Schema({
   user_id: { type: String, required: true },
   nurse_id: { type: String, required: true },
   patient_ids: { type: [String], required: true },
-  estado: { type: String, enum: ['pendiente', 'en_progreso', 'completado'], default: 'pendiente' },
+  estado: { type: String, required: true },
   detalles: { type: String, required: true },
   fecha: { type: Date, required: true },
   tarifa: { type: Number, default: 0 },
