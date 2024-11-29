@@ -1,7 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const ServiceRequest = require('../models/ServiceRequest');
-const { authenticateToken } = require('../middleware/auth2');
+const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -70,8 +70,8 @@ router.post('/', authenticateToken, async (req, res) => {
   try {
     const serviceRequest = new ServiceRequest({
       user_id: userId,
-      nurse_id: new mongoose.Types.ObjectId(nurse_id),
-      patient_ids: patient_ids.map(id => new mongoose.Types.ObjectId(id)),
+      nurse_id, // Guardamos nurse_id como string
+      patient_ids, // Lista de strings para los pacientes
       detalles,
       fecha,
       tarifa,
@@ -137,8 +137,8 @@ router.get('/', authenticateToken, async (req, res) => {
   try {
     const filter = {
       $or: [
-        { user_id: userId },
-        { nurse_id: userId },
+        { user_id: userId }, // Filtramos por usuario creador
+        { nurse_id: userId }, // Filtramos por enfermero asignado
       ],
     };
 
@@ -211,7 +211,13 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
   try {
     const serviceRequest = await ServiceRequest.findOneAndUpdate(
-      { _id: req.params.id, $or: [{ user_id: userId }, { nurse_id: userId }] },
+      {
+        _id: req.params.id,
+        $or: [
+          { user_id: userId }, // Validación por usuario creador
+          { nurse_id: userId }, // Validación por enfermero asignado
+        ],
+      },
       { estado },
       { new: true }
     );
