@@ -194,32 +194,30 @@ router.get('/nurse/:nurse_id', authenticateToken, async (req, res) => {
  *         description: Error al modificar el estado de la solicitud
  */
 router.put('/:id/estado', authenticateToken, async (req, res) => {
-  const { id } = req.params; // Obtener el id de la solicitud de servicio de la ruta
-  const { estado } = req.body; // Obtener el nuevo estado del cuerpo de la solicitud
+  const { id } = req.params;
+  const { estado } = req.body;
 
-  // Verificar si el estado es válido
   if (!estado || !['pendiente', 'en_progreso', 'completado'].includes(estado)) {
     return res.status(400).json({ message: 'Estado no válido' });
   }
 
   try {
-    // Obtener la solicitud de servicio por su ID
     const serviceRequest = await ServiceRequest.findById(id);
 
     if (!serviceRequest) {
       return res.status(404).json({ message: 'Solicitud de servicio no encontrada' });
     }
 
-    // Verificar que el enfermero que está haciendo la solicitud tenga el mismo nurse_id
-    if (serviceRequest.nurse_id.toString() !== req.user_id.userId) {
+    console.log('Nurse ID en el servicio:', serviceRequest.nurse_id.toString());
+    console.log('User ID del token:', req.user_id);
+
+    if (serviceRequest.nurse_id.toString() !== req.user_id) {
       return res.status(403).json({ message: 'No tienes permiso para modificar esta solicitud' });
     }
 
-    // Actualizar el estado de la solicitud
     serviceRequest.estado = estado;
     await serviceRequest.save();
 
-    // Devolver la respuesta con el servicio actualizado
     res.json({ message: 'Estado actualizado correctamente', serviceRequest });
   } catch (err) {
     console.error(err);
