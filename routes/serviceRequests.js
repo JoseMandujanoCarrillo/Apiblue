@@ -1,6 +1,6 @@
 const express = require('express');
 const ServiceRequest = require('../models/ServiceRequest'); // Modelo de solicitud de servicio
-const mongoose = require('mongoose');
+const mongoose = require('mongoose'); // Necesario para trabajar con ObjectId
 
 const router = express.Router();
 
@@ -58,11 +58,14 @@ router.post('/', async (req, res) => {
   }
 
   try {
+    // Asegurarse de convertir el user_id a ObjectId
+    const validUserId = new mongoose.Types.ObjectId(user_id);
+
     // Crear la nueva solicitud de servicio
     const newServiceRequest = new ServiceRequest({
       paciente_id,
       enfermero_id,
-      usuario_id: user_id, // Usar directamente el `user_id` recibido
+      usuario_id: validUserId, // Usar el user_id convertido a ObjectId
       estado,
       descripcion,
       tarifa,
