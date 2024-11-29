@@ -1,5 +1,6 @@
 const express = require('express');
 const ServiceRequest = require('../models/ServiceRequest'); // Modelo de solicitud de servicio
+const mongoose = require('mongoose');
 
 const router = express.Router();
 
@@ -51,6 +52,11 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ message: 'user_id, paciente_id, enfermero_id y estado son obligatorios' });
   }
 
+  // Validar que el user_id sea un ObjectId válido
+  if (!mongoose.Types.ObjectId.isValid(user_id)) {
+    return res.status(400).json({ message: 'El user_id no es un ObjectId válido' });
+  }
+
   try {
     // Crear la nueva solicitud de servicio
     const newServiceRequest = new ServiceRequest({
@@ -65,7 +71,10 @@ router.post('/', async (req, res) => {
 
     await newServiceRequest.save();
 
-    res.status(201).json(newServiceRequest);
+    // Excluir `_id` en la respuesta para mantener consistencia
+    const { _id, ...serviceRequestData } = newServiceRequest.toObject(); 
+
+    res.status(201).json(serviceRequestData);
   } catch (error) {
     res.status(400).json({ message: 'Error al crear la solicitud', error: error.message });
   }
