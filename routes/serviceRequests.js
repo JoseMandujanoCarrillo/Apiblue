@@ -49,26 +49,28 @@ const router = express.Router();
  *         description: No autorizado. Token no proporcionado o no válido.
  */
 router.post('/', authenticateToken, async (req, res) => {
-    const { user_id, nurse_id, patient_ids, estado, detalles, fecha, tarifa, pago_realizado, pago_liberado } = req.body;
+  const { user_id, nurse_id, patient_ids, estado, detalles, fecha, tarifa, pago_realizado, pago_liberado } = req.body;
 
-    const newServiceRequest = new ServiceRequest({
-        user_id,
-        nurse_id,
-        patient_ids,
-        estado,
-        detalles,
-        fecha,
-        tarifa,
-        pago_realizado,
-        pago_liberado,
-    });
+  try {
+      const newServiceRequest = new ServiceRequest({
+          user_id,
+          nurse_id,
+          patient_ids,
+          estado,
+          detalles,
+          fecha,
+          tarifa,
+          pago_realizado,
+          pago_liberado,
+      });
 
-    try {
-        const savedServiceRequest = await newServiceRequest.save();
-        res.status(201).json(savedServiceRequest);
-    } catch (err) {
-        res.status(400).json({ message: err.message });
-    }
+      // Guardar la solicitud de servicio en la base de datos
+      const savedServiceRequest = await newServiceRequest.save();
+      res.status(201).json(savedServiceRequest);
+  } catch (err) {
+      console.error('Error en la creación de la solicitud de servicio:', err);
+      res.status(500).json({ message: 'Error interno del servidor' });
+  }
 });
 
 module.exports = router;
