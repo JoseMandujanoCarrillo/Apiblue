@@ -1,6 +1,5 @@
 const express = require('express');
 const ServiceRequest = require('../models/ServiceRequest'); // Modelo de solicitud de servicio
-const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -10,8 +9,6 @@ const router = express.Router();
  *   post:
  *     summary: Crear una nueva solicitud de servicio
  *     tags: [ServiceRequests]
- *     security:
- *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -19,6 +16,9 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             properties:
+ *               user_id:
+ *                 type: string
+ *                 description: ID del usuario (quien realiza la solicitud)
  *               paciente_id:
  *                 type: string
  *                 description: ID del paciente
@@ -42,21 +42,13 @@ const router = express.Router();
  *         description: Solicitud de servicio creada exitosamente
  *       400:
  *         description: Error al crear la solicitud
- *       401:
- *         description: Token no proporcionado o no válido
  */
-router.post('/', authenticateToken, async (req, res) => {
-  const { paciente_id, enfermero_id, estado, descripcion, tarifa, duracion } = req.body;
-  const { userId } = req.user_id; // Extraer `userId` del token, ya validado como ObjectId
+router.post('/', async (req, res) => {
+  const { user_id, paciente_id, enfermero_id, estado, descripcion, tarifa, duracion } = req.body;
 
   // Validar campos obligatorios
-  if (!paciente_id || !enfermero_id || !estado) {
-    return res.status(400).json({ message: 'paciente_id, enfermero_id y estado son obligatorios' });
-  }
-
-  // Validar que el userId esté presente y sea un ObjectId válido
-  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
-    return res.status(400).json({ message: 'El userId en el token no es válido' });
+  if (!user_id || !paciente_id || !enfermero_id || !estado) {
+    return res.status(400).json({ message: 'user_id, paciente_id, enfermero_id y estado son obligatorios' });
   }
 
   try {
@@ -64,17 +56,16 @@ router.post('/', authenticateToken, async (req, res) => {
     const newServiceRequest = new ServiceRequest({
       paciente_id,
       enfermero_id,
-      usuario_id: userId, // Asociar al usuario autenticado (con ObjectId válido)
+      usuario_id: user_id, // Usar directamente el `user_id` recibido
       estado,
       descripcion,
       tarifa,
-      duracion,
+      duracion
     });
 
     await newServiceRequest.save();
 
-    const { _id, ...serviceRequestData } = newServiceRequest.toObject(); // Excluir `_id` de la respuesta
-    res.status(201).json(serviceRequestData);
+    res.status(201).json(newServiceRequest);
   } catch (error) {
     res.status(400).json({ message: 'Error al crear la solicitud', error: error.message });
   }
