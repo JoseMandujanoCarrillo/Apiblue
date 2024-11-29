@@ -85,7 +85,7 @@ router.post('/', authenticateToken, async (req, res) => {
 
   try {
     const newServiceRequest = new ServiceRequest({
-      user_id,
+      usuario_id: user_id,
       nurse_id,
       patient_ids,
       estado,
