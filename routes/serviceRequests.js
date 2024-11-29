@@ -73,7 +73,8 @@ router.post('/', authenticateToken, async (req, res) => {
 
     await newServiceRequest.save();
 
-    res.status(201).json(newServiceRequest);
+    const { _id, ...serviceRequestData } = newServiceRequest.toObject(); // Excluir `_id` de la respuesta
+    res.status(201).json(serviceRequestData);
   } catch (error) {
     res.status(400).json({ message: 'Error al crear la solicitud', error: error.message });
   }
