@@ -14,13 +14,12 @@ function authenticateToken(req, res, next) {
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) return res.status(403).json({ message: 'Token no válido' });
 
-    // Validamos que el userId sea un ObjectId válido si es necesario
-    // Si el userId es un string, no necesitas validarlo como ObjectId
-    if (user.userId && !mongoose.Types.ObjectId.isValid(user.userId)) {
-      return res.status(400).json({ message: 'El userId en el token no es un ObjectId válido' });
+    // Validación opcional: Si `userId` es String, no hace falta validarlo como ObjectId
+    if (!user.userId) {
+      return res.status(400).json({ message: 'No se encontró el userId en el token' });
     }
 
-    // Almacena el userId y role en el request para usarlos en las rutas
+    // Si todo está bien, almacenamos `userId` y `role` en `req.user_id`
     req.user_id = { userId: user.userId, role: user.role };
     next();
   });
