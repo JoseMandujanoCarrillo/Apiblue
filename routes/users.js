@@ -23,6 +23,10 @@ const router = express.Router();
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - name
+ *               - user_name
+ *               - password
  *             properties:
  *               name:
  *                 type: string
@@ -32,8 +36,10 @@ const router = express.Router();
  *                 type: string
  *               foto:
  *                 type: string
- *               verificado:
+ *               comidaFavorita:
  *                 type: string
+ *               descuentoNavideño:
+ *                 type: number
  *     responses:
  *       201:
  *         description: Usuario registrado exitosamente
@@ -44,7 +50,7 @@ router.post('/register', async (req, res) => {
   try {
     const newUser = new User(req.body);
     await newUser.save();
-    const token = generateToken(newUser._id);
+    const token = generateToken({ userId: newUser._id, role: 'usuario' });
     res.status(201).json({ user: newUser, token });
   } catch (error) {
     res.status(400).json({ message: 'Error al registrar el usuario', error: error.message });
@@ -63,6 +69,9 @@ router.post('/register', async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - user_name
+ *               - password
  *             properties:
  *               user_name:
  *                 type: string
