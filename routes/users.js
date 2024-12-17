@@ -6,52 +6,6 @@ const router = express.Router();
 
 /**
  * @swagger
- * components:
- *   schemas:
- *     User:
- *       type: object
- *       properties:
- *         _id:
- *           type: string
- *           description: ID único del usuario
- *         name:
- *           type: string
- *           description: Nombre del usuario
- *         user_name:
- *           type: string
- *           description: Nombre de usuario único
- *         password:
- *           type: string
- *           description: Contraseña del usuario
- *         foto:
- *           type: string
- *           description: URL de la foto del usuario
- *         verificado:
- *           type: string
- *           description: Estado de verificación del usuario
- *         comidaFavorita:
- *           type: string
- *           description: Comida favorita del usuario
- *         descuentoNavideño:
- *           type: number
- *           description: Porcentaje de descuento navideño
- *       required:
- *         - name
- *         - user_name
- *         - password
- *       example:
- *         _id: "63a1c8ef4f1c4d1f88e6b056"
- *         name: "Juan Pérez"
- *         user_name: "juanp"
- *         password: "123456"
- *         foto: "https://example.com/foto.jpg"
- *         verificado: "No"
- *         comidaFavorita: "Pizza"
- *         descuentoNavideño: 10
- */
-
-/**
- * @swagger
  * tags:
  *   name: Users
  *   description: Endpoints para la gestión de usuarios
@@ -121,10 +75,10 @@ router.post('/register', async (req, res) => {
  *             properties:
  *               user_name:
  *                 type: string
- *                 description: Nombre de usuario único
+ *                 description: "Nombre de usuario o correo electrónico del usuario"
  *               password:
  *                 type: string
- *                 description: Contraseña del usuario
+ *                 description: "Contraseña del usuario"
  *     responses:
  *       200:
  *         description: Inicio de sesión exitoso
@@ -204,6 +158,7 @@ router.get('/panel', authenticateToken, (req, res) => {
  */
 router.get('/me', authenticateToken, async (req, res) => {
   try {
+    // `req.user` contiene el userId después de ser decodificado por `authenticateToken`
     const user = await User.findById(req.user.userId);
     if (!user) {
       return res.status(404).json({ message: 'Usuario no encontrado' });
