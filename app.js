@@ -37,6 +37,35 @@ const swaggerOptions = {
                     description: "Agrega aquí tu token JWT para autenticación",
                 },
             },
+            schemas: {
+                User: { // Define el esquema User aquí
+                    type: 'object',
+                    properties: {
+                        name: {
+                            type: 'string',
+                        },
+                        user_name: {
+                            type: 'string',
+                        },
+                        password: {
+                            type: 'string',
+                        },
+                        foto: {
+                            type: 'string',
+                        },
+                        verificado: {
+                            type: 'string',
+                        },
+                        comidaFavorita: {
+                            type: 'string',
+                        },
+                        descuentoNavideño: {
+                            type: 'number',
+                        },
+                    },
+                    required: ['name', 'user_name', 'password'], // Campos requeridos
+                },
+            },
         },
         security: [
             {
