@@ -203,4 +203,37 @@ router.get('/panel', authenticateToken, (req, res) => {
   });
 });
 
+/**
+ * @swagger
+ * /users/me:
+ *   get:
+ *     summary: Obtener la información del usuario autenticado
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Información del usuario autenticado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       401:
+ *         description: No autorizado, token no proporcionado o inválido
+ */
+router.get('/me', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+    res.status(200).json({ user });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener el usuario', error: error.message });
+  }
+});
+
 module.exports = router;
