@@ -196,38 +196,4 @@ router.get('/panel', authenticateToken, (req, res) => {
 
 module.exports = router;
 
-/**
- * @swagger
- * /users/me:
- *   get:
- *     summary: Obtener los datos del usuario autenticado
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Datos del usuario autenticado
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/User'
- *       401:
- *         description: No autorizado, token inválido
- *       404:
- *         description: Usuario no encontrado
- */
-router.get('/me', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.userId; // Extrae el userId del token JWT
-    const user = await User.findById(userId).select('-password'); // Busca el usuario y excluye el campo "password"
-
-    if (!user) {
-      return res.status(404).json({ message: 'Usuario no encontrado' });
-    }
-
-    res.status(200).json(user);
-  } catch (error) {
-    res.status(500).json({ message: 'Error al obtener los datos del usuario', error: error.message });
-  }
-});
 
